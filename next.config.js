@@ -5,6 +5,15 @@
 import "./src/env.js";
 
 /** @type {import("next").NextConfig} */
-const config = {};
+const config = {
+  images: {
+    remotePatterns: [
+      // Google profile photos
+      { protocol: "https", hostname: "lh3.googleusercontent.com" },
+      // Supabase Storage
+      { protocol: "https", hostname: "*.supabase.co", pathname: "/storage/v1/object/public/**" },
+    ],
+  },
+};
 
 export default config;
