@@ -75,13 +75,13 @@ function EditCard({
 
   // Only show rows where a change was actually proposed
   const changedFields = PROFILE_FIELDS.filter(
-    (f) => edit[f.key as FieldKey] !== null,
+    (f) => edit[f.key] !== null,
   );
 
   function formatValue(key: FieldKey, value: unknown) {
     if (value === null || value === undefined) return <span className="text-gray-300 italic">unchanged</span>;
     if (key === "graduationDate") return new Date(value as string).toLocaleDateString();
-    return String(value);
+    return String(value as string);
   }
 
   return (
@@ -128,7 +128,7 @@ function EditCard({
           <tbody className="divide-y divide-gray-50">
             {changedFields.map((f) => {
               const current = edit.user[f.key as keyof typeof edit.user];
-              const proposed = edit[f.key as FieldKey];
+              const proposed = edit[f.key];
               const changed = String(current ?? "") !== String(proposed ?? "");
               return (
                 <tr key={f.key}>

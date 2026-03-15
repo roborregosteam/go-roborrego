@@ -200,7 +200,7 @@ export const workPlanRouter = createTRPCRouter({
       z.object({
         id: z.string(),
         status: z.enum(["APPROVED", "REJECTED"]),
-        adminNote: z.string().optional(),
+        adminNote: z.string().optional().transform((v) => v !== "" ? v : undefined),
       }),
     )
     .mutation(({ ctx, input }) => {

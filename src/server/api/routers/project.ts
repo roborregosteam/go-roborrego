@@ -109,7 +109,7 @@ export const projectRouter = createTRPCRouter({
         const project = await tx.project.create({
           data: {
             ...input,
-            githubRepo: input.githubRepo || undefined,
+            githubRepo: input.githubRepo,
             createdBy: ctx.session.user.id,
           },
         });
@@ -152,7 +152,7 @@ export const projectRouter = createTRPCRouter({
       }
       return ctx.db.project.update({
         where: { id },
-        data: { ...data, githubRepo: data.githubRepo || undefined },
+        data: { ...data, githubRepo: data.githubRepo },
       });
     }),
 
@@ -302,7 +302,9 @@ export const projectRouter = createTRPCRouter({
           ...(!isAdmin && {
             OR: [
               { project: { isPrivate: false } },
-              { members: { some: { userId: ctx.session.user.id } } },
+              {
+                project: { members: { some: { userId: ctx.session.user.id } } },
+              },
             ],
           }),
         },
@@ -328,7 +330,9 @@ export const projectRouter = createTRPCRouter({
           ...(!isAdmin && {
             OR: [
               { project: { isPrivate: false } },
-              { members: { some: { userId: ctx.session.user.id } } },
+              {
+                project: { members: { some: { userId: ctx.session.user.id } } },
+              },
             ],
           }),
         },
