@@ -670,10 +670,10 @@ async function callTool(
             ? new Date(args.graduationDate as string)
             : undefined,
           subtitle: (args.subtitle as string) ?? undefined,
-          semesters: (args.semesters as number) ?? undefined,
+          semesters: args.semesters !== undefined ? Number(args.semesters) : undefined,
           tags: (args.tags as string) ?? undefined,
           excludeFromExport: (args.excludeFromExport as boolean) ?? undefined,
-          webId: (args.webId as number) ?? undefined,
+          webId: args.webId !== undefined ? Number(args.webId) : undefined,
         },
         select: {
           id: true,
@@ -712,6 +712,7 @@ async function callTool(
         select: { id: true },
       });
       if (!existing) return toolError(`No user found with email ${email}`);
+
       const member = await db.user.update({
         where: { email },
         data: {
@@ -743,13 +744,13 @@ async function callTool(
             subtitle: args.subtitle as string,
           }),
           ...(args.semesters !== undefined && {
-            semesters: args.semesters as number,
+            semesters: Number(args.semesters),
           }),
           ...(args.tags !== undefined && { tags: args.tags as string }),
           ...(args.excludeFromExport !== undefined && {
             excludeFromExport: args.excludeFromExport as boolean,
           }),
-          ...(args.webId !== undefined && { webId: args.webId as number }),
+          ...(args.webId !== undefined && { webId: Number(args.webId) }),
         },
         select: {
           id: true,
@@ -869,7 +870,7 @@ async function callTool(
           semesterId: args.semesterId as string,
           name: args.name as string,
           description: (args.description as string) ?? undefined,
-          points: args.points as number,
+          points: Number(args.points),
           isMandatory: (args.isMandatory as boolean) ?? false,
         },
       });
@@ -882,7 +883,7 @@ async function callTool(
       const data: Record<string, unknown> = {};
       if (args.name !== undefined) data.name = args.name;
       if (args.description !== undefined) data.description = args.description;
-      if (args.points !== undefined) data.points = args.points;
+      if (args.points !== undefined) data.points = Number(args.points);
       if (args.isMandatory !== undefined) data.isMandatory = args.isMandatory;
       const activity = await db.workPlanActivity.update({
         where: { id: args.activityId as string },
@@ -1041,8 +1042,16 @@ export async function POST(request: Request) {
         name: string;
         arguments?: Record<string, unknown>;
       };
-      const result = await callTool(name, args, user);
-      return rpcResponse(id, result);
+      try {
+        const result = await callTool(name, args, user);
+        return rpcResponse(id, result);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        return rpcResponse(id, {
+          content: [{ type: "text", text: `Error: ${message}` }],
+          isError: true,
+        });
+      }
     }
 
     case "ping":
