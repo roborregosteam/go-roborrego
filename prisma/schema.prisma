@@ -119,6 +119,13 @@ model User {
     role           Role         @default(VIEWER)
     status         MemberStatus @default(ACTIVE)
     lastLoginAt    DateTime?
+    // Web export
+    webId             Int?     @unique
+    lastname          String?
+    subtitle          String?
+    semesters         Int?
+    tags              String?
+    excludeFromExport Boolean  @default(false)
 
     // NextAuth relations
     accounts Account[]

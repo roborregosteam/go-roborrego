@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { api, type RouterOutputs } from "~/trpc/react";
 
@@ -175,6 +176,89 @@ export function AdminDashboardClient() {
             ))}
           </div>
         </Section>
+
+        {/* Web export */}
+        <WebExportPanel />
+      </div>
+    </div>
+  );
+}
+
+function WebExportPanel() {
+  const [result, setResult] = useState<{ prUrl?: string; prNumber?: number; memberCount?: number; imagesUploaded?: number; newIdAssignments?: number } | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const exportMutation = api.admin.exportToWebRepo.useMutation({
+    onSuccess: (data) => {
+      if (!data.dryRun) setResult(data);
+    },
+    onError: (e) => setError(e.message),
+  });
+
+  const dryRunMutation = api.admin.exportToWebRepo.useMutation({
+    onSuccess: (data) => {
+      if (data.dryRun) {
+        const preview = data as { dryRun: true; memberCount: number; newIdAssignments: number };
+        setResult({ memberCount: preview.memberCount, newIdAssignments: preview.newIdAssignments });
+      }
+    },
+    onError: (e) => setError(e.message),
+  });
+
+  const isBusy = exportMutation.isPending || dryRunMutation.isPending;
+
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden lg:col-span-2">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+        <h2 className="text-sm font-semibold text-gray-900">Export Members to Website</h2>
+        <span className="text-xs text-gray-400">roborregos-web</span>
+      </div>
+      <div className="px-4 py-4 space-y-3">
+        <p className="text-xs text-gray-500">
+          Creates a pull request on <span className="font-mono">RoBorregos/roborregos-web</span> with
+          updated <span className="font-mono">members.json</span> and member images.
+          Members marked &ldquo;Exclude from export&rdquo; are skipped. Web IDs are auto-assigned if missing.
+        </p>
+
+        {error && (
+          <p className="text-xs text-red-600 bg-red-50 rounded-lg px-3 py-2">{error}</p>
+        )}
+
+        {result?.prUrl && (
+          <div className="text-xs bg-green-50 border border-green-200 rounded-lg px-3 py-2 space-y-1">
+            <p className="font-medium text-green-800">PR created successfully</p>
+            <p className="text-green-700">
+              {result.memberCount} members · {result.imagesUploaded} images · {result.newIdAssignments} new IDs assigned
+            </p>
+            <a href={result.prUrl} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline font-mono">
+              PR #{result.prNumber}
+            </a>
+          </div>
+        )}
+
+        {result && !result.prUrl && (
+          <div className="text-xs bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
+            <p className="font-medium text-blue-800">Dry run complete</p>
+            <p className="text-blue-700">{result.memberCount} members to export · {result.newIdAssignments} would get new IDs</p>
+          </div>
+        )}
+
+        <div className="flex gap-2">
+          <button
+            onClick={() => { setError(null); setResult(null); dryRunMutation.mutate({ dryRun: true }); }}
+            disabled={isBusy}
+            className="px-3 py-1.5 text-xs border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 disabled:opacity-50 transition-colors"
+          >
+            {dryRunMutation.isPending ? "Running…" : "Dry Run"}
+          </button>
+          <button
+            onClick={() => { setError(null); setResult(null); exportMutation.mutate({ dryRun: false }); }}
+            disabled={isBusy}
+            className="px-3 py-1.5 text-xs bg-[#1a2744] text-white rounded-lg hover:bg-[#243660] disabled:opacity-50 transition-colors"
+          >
+            {exportMutation.isPending ? "Creating PR…" : "Create PR"}
+          </button>
+        </div>
       </div>
     </div>
   );

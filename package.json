@@ -27,6 +27,7 @@
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
     "@modelcontextprotocol/sdk": "^1.27.1",
+    "@octokit/auth-app": "^8.2.0",
     "@prisma/client": "^6.6.0",
     "@supabase/supabase-js": "^2.99.1",
     "@t3-oss/env-nextjs": "^0.12.0",

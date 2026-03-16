@@ -23,6 +23,13 @@ export function EditMemberForm({ member }: { member: Member }) {
     graduationDate: member.graduationDate
       ? new Date(member.graduationDate).toISOString().slice(0, 10)
       : "",
+    // Web export
+    webId: member.webId !== null ? String(member.webId) : "",
+    lastname: member.lastname ?? "",
+    subtitle: member.subtitle ?? "",
+    semesters: member.semesters !== null ? String(member.semesters) : "",
+    tags: member.tags ?? "",
+    excludeFromExport: member.excludeFromExport,
   });
 
   const updateMember = api.member.updateMember.useMutation({
@@ -53,9 +60,13 @@ export function EditMemberForm({ member }: { member: Member }) {
       bio: form.bio || undefined,
       githubUsername: form.githubUsername || undefined,
       linkedinUrl: form.linkedinUrl || undefined,
-      graduationDate: form.graduationDate
-        ? new Date(form.graduationDate)
-        : undefined,
+      graduationDate: form.graduationDate ? new Date(form.graduationDate) : undefined,
+      webId: form.webId ? parseInt(form.webId, 10) : undefined,
+      lastname: form.lastname || undefined,
+      subtitle: form.subtitle || undefined,
+      semesters: form.semesters ? parseInt(form.semesters, 10) : undefined,
+      tags: form.tags || undefined,
+      excludeFromExport: form.excludeFromExport,
     });
   }
 
@@ -194,6 +205,60 @@ export function EditMemberForm({ member }: { member: Member }) {
             placeholder="https://linkedin.com/in/yourprofile"
             type="url"
           />
+        </Section>
+
+        {/* Web Export */}
+        <Section title="Web Export">
+          <div className="grid grid-cols-2 gap-4">
+            <Field
+              label="Web ID"
+              name="webId"
+              value={form.webId}
+              onChange={handleChange}
+              placeholder="Auto-assigned on export"
+              type="number"
+            />
+            <Field
+              label="Last Name"
+              name="lastname"
+              value={form.lastname}
+              onChange={handleChange}
+              placeholder="Auto-split from full name"
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <Field
+              label="Subtitle"
+              name="subtitle"
+              value={form.subtitle}
+              onChange={handleChange}
+              placeholder="e.g. Alumni, Founder & Alumni"
+            />
+            <Field
+              label="Semesters"
+              name="semesters"
+              value={form.semesters}
+              onChange={handleChange}
+              placeholder="Number of semesters"
+              type="number"
+            />
+          </div>
+          <Field
+            label="Tags"
+            name="tags"
+            value={form.tags}
+            onChange={handleChange}
+            placeholder="Comma-separated: Programmer, Software, Alumni"
+          />
+          <label className="flex items-center gap-2 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={form.excludeFromExport}
+              onChange={(e) => setForm((prev) => ({ ...prev, excludeFromExport: e.target.checked }))}
+              className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+            />
+            <span className="text-sm text-gray-700">Exclude from web export</span>
+          </label>
         </Section>
 
         {/* Actions */}

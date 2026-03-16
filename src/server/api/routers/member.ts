@@ -76,6 +76,12 @@ export const memberRouter = createTRPCRouter({
           subTeam: true,
           role: true,
           status: true,
+          webId: true,
+          lastname: true,
+          subtitle: true,
+          semesters: true,
+          tags: true,
+          excludeFromExport: true,
         },
       });
       if (!user) throw new TRPCError({ code: "NOT_FOUND" });
@@ -159,6 +165,13 @@ export const memberRouter = createTRPCRouter({
         githubUsername: z.string().optional(),
         linkedinUrl: z.string().url().optional().or(z.literal("")),
         graduationDate: z.date().optional(),
+        // Web export metadata
+        webId: z.number().int().positive().optional(),
+        lastname: z.string().optional(),
+        subtitle: z.string().optional(),
+        semesters: z.number().int().min(0).optional(),
+        tags: z.string().optional(),
+        excludeFromExport: z.boolean().optional(),
       }),
     )
     .mutation(({ ctx, input }) => {
