@@ -16,7 +16,20 @@
 import crypto from "crypto";
 
 import type { Prisma } from "../../../../generated/prisma";
+import { supabaseAdmin } from "~/lib/supabase-admin";
 import { db } from "~/server/db";
+import { env } from "~/env.js";
+
+async function uploadAvatar(userId: string, imageBase64: string, contentType: string): Promise<string> {
+  const ext = contentType.split("/")[1] ?? "jpg";
+  const path = `${userId}.${ext}`;
+  const buffer = Buffer.from(imageBase64, "base64");
+  const { error } = await supabaseAdmin.storage
+    .from("avatars")
+    .upload(path, buffer, { contentType, upsert: true });
+  if (error) throw new Error(`Image upload failed: ${error.message}`);
+  return `${env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/avatars/${path}`;
+}
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -150,8 +163,48 @@ const TOOLS = [
       properties: {
         email: { type: "string" },
         name: { type: "string" },
+        lastname: { type: "string" },
         role: { type: "string", enum: ["VIEWER", "MEMBER", "ADMIN"] },
+        status: { type: "string", enum: ["ACTIVE", "INACTIVE", "ALUMNI"] },
         subTeam: { type: "string" },
+        phone: { type: "string" },
+        bio: { type: "string" },
+        githubUsername: { type: "string" },
+        linkedinUrl: { type: "string" },
+        graduationDate: { type: "string", description: "ISO date string" },
+        subtitle: { type: "string" },
+        semesters: { type: "number" },
+        tags: { type: "string", description: "Comma-separated skill tags" },
+        excludeFromExport: { type: "boolean" },
+        imageBase64: { type: "string", description: "Avatar image as base64" },
+        imageContentType: { type: "string", description: "MIME type, e.g. image/jpeg" },
+      },
+    },
+  },
+  {
+    name: "update_member",
+    description: "Update profile fields for an existing member. Only provided fields are changed. Admin only.",
+    inputSchema: {
+      type: "object",
+      required: ["email"],
+      properties: {
+        email: { type: "string" },
+        name: { type: "string" },
+        lastname: { type: "string" },
+        role: { type: "string", enum: ["VIEWER", "MEMBER", "ADMIN"] },
+        status: { type: "string", enum: ["ACTIVE", "INACTIVE", "ALUMNI"] },
+        subTeam: { type: "string" },
+        phone: { type: "string" },
+        bio: { type: "string" },
+        githubUsername: { type: "string" },
+        linkedinUrl: { type: "string" },
+        graduationDate: { type: "string", description: "ISO date string" },
+        subtitle: { type: "string" },
+        semesters: { type: "number" },
+        tags: { type: "string", description: "Comma-separated skill tags" },
+        excludeFromExport: { type: "boolean" },
+        imageBase64: { type: "string", description: "Avatar image as base64" },
+        imageContentType: { type: "string", description: "MIME type, e.g. image/jpeg" },
       },
     },
   },
@@ -478,12 +531,61 @@ async function callTool(
         data: {
           email,
           name: (args.name as string) ?? email.split("@")[0],
+          lastname: (args.lastname as string) ?? undefined,
           role: (args.role as "VIEWER" | "MEMBER" | "ADMIN") ?? "MEMBER",
+          status: (args.status as "ACTIVE" | "INACTIVE" | "ALUMNI") ?? "ACTIVE",
           subTeam: (args.subTeam as string) ?? undefined,
+          phone: (args.phone as string) ?? undefined,
+          bio: (args.bio as string) ?? undefined,
+          githubUsername: (args.githubUsername as string) ?? undefined,
+          linkedinUrl: (args.linkedinUrl as string) ?? undefined,
+          graduationDate: args.graduationDate ? new Date(args.graduationDate as string) : undefined,
+          subtitle: (args.subtitle as string) ?? undefined,
+          semesters: (args.semesters as number) ?? undefined,
+          tags: (args.tags as string) ?? undefined,
+          excludeFromExport: (args.excludeFromExport as boolean) ?? undefined,
         },
-        select: { id: true, email: true, name: true, role: true, subTeam: true },
+        select: { id: true, email: true, name: true, lastname: true, role: true, status: true, subTeam: true },
       });
+      if (args.imageBase64 && args.imageContentType) {
+        const imageUrl = await uploadAvatar(member.id, args.imageBase64 as string, args.imageContentType as string);
+        await db.user.update({ where: { id: member.id }, data: { image: imageUrl } });
+        return ok({ message: "Member registered", member: { ...member, image: imageUrl } });
+      }
       return ok({ message: "Member registered", member });
+    }
+
+    case "update_member": {
+      if (user.role !== "ADMIN") return forbidden("Only ADMINs can update members");
+      const email = (args.email as string).toLowerCase();
+      const existing = await db.user.findUnique({ where: { email }, select: { id: true } });
+      if (!existing) return toolError(`No user found with email ${email}`);
+      const member = await db.user.update({
+        where: { email },
+        data: {
+          ...(args.name !== undefined && { name: args.name as string }),
+          ...(args.lastname !== undefined && { lastname: args.lastname as string }),
+          ...(args.role !== undefined && { role: args.role as "VIEWER" | "MEMBER" | "ADMIN" }),
+          ...(args.status !== undefined && { status: args.status as "ACTIVE" | "INACTIVE" | "ALUMNI" }),
+          ...(args.subTeam !== undefined && { subTeam: args.subTeam as string }),
+          ...(args.phone !== undefined && { phone: args.phone as string }),
+          ...(args.bio !== undefined && { bio: args.bio as string }),
+          ...(args.githubUsername !== undefined && { githubUsername: args.githubUsername as string }),
+          ...(args.linkedinUrl !== undefined && { linkedinUrl: args.linkedinUrl as string }),
+          ...(args.graduationDate !== undefined && { graduationDate: new Date(args.graduationDate as string) }),
+          ...(args.subtitle !== undefined && { subtitle: args.subtitle as string }),
+          ...(args.semesters !== undefined && { semesters: args.semesters as number }),
+          ...(args.tags !== undefined && { tags: args.tags as string }),
+          ...(args.excludeFromExport !== undefined && { excludeFromExport: args.excludeFromExport as boolean }),
+        },
+        select: { id: true, email: true, name: true, lastname: true, role: true, status: true, subTeam: true },
+      });
+      if (args.imageBase64 && args.imageContentType) {
+        const imageUrl = await uploadAvatar(member.id, args.imageBase64 as string, args.imageContentType as string);
+        await db.user.update({ where: { id: member.id }, data: { image: imageUrl } });
+        return ok({ message: "Member updated", member: { ...member, image: imageUrl } });
+      }
+      return ok({ message: "Member updated", member });
     }
 
     case "create_meeting": {
