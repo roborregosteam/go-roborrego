@@ -119,14 +119,14 @@ export const adminRouter = createTRPCRouter({
   exportToWebRepo: adminProcedure
     .input(z.object({ dryRun: z.boolean().default(false) }))
     .mutation(async ({ ctx, input }) => {
-      const REPO = env.GITHUB_WEB_REPO;
+      const REPO = env._GITHUB_WEB_REPO;
       const BASE_BRANCH = "develop";
       const GH = "https://api.github.com";
 
       const auth = createAppAuth({
-        appId: env.GITHUB_APP_ID,
-        privateKey: env.GITHUB_APP_PRIVATE_KEY.replace(/\\n/g, "\n"),
-        installationId: Number(env.GITHUB_APP_INSTALLATION_ID),
+        appId: env._GITHUB_APP_ID,
+        privateKey: env._GITHUB_APP_PRIVATE_KEY.replace(/\\n/g, "\n"),
+        installationId: Number(env._GITHUB_APP_INSTALLATION_ID),
       });
       const { token } = await auth({ type: "installation" });
 
@@ -142,10 +142,21 @@ export const adminRouter = createTRPCRouter({
         where: { excludeFromExport: false },
         orderBy: { webId: { sort: "asc", nulls: "last" } },
         select: {
-          id: true, name: true, lastname: true, email: true, image: true,
-          bio: true, githubUsername: true, linkedinUrl: true,
-          subTeam: true, subtitle: true, status: true,
-          graduationDate: true, semesters: true, tags: true, webId: true,
+          id: true,
+          name: true,
+          lastname: true,
+          email: true,
+          image: true,
+          bio: true,
+          githubUsername: true,
+          linkedinUrl: true,
+          subTeam: true,
+          subtitle: true,
+          status: true,
+          graduationDate: true,
+          semesters: true,
+          tags: true,
+          webId: true,
         },
       });
 
@@ -162,7 +173,10 @@ export const adminRouter = createTRPCRouter({
       if (idAssignments.length > 0 && !input.dryRun) {
         await Promise.all(
           idAssignments.map((a) =>
-            ctx.db.user.update({ where: { id: a.id }, data: { webId: a.webId } }),
+            ctx.db.user.update({
+              where: { id: a.id },
+              data: { webId: a.webId },
+            }),
           ),
         );
       }
@@ -179,10 +193,14 @@ export const adminRouter = createTRPCRouter({
           status: m.status === "ACTIVE" ? "active" : "inactive",
           role: m.subTeam ?? "",
           subtitle: m.subtitle ?? "",
-          class: m.graduationDate ? String(new Date(m.graduationDate).getFullYear()) : "",
+          class: m.graduationDate
+            ? String(new Date(m.graduationDate).getFullYear())
+            : "",
           semesters: m.semesters !== null ? String(m.semesters) : "",
           description: m.bio ?? "",
-          github: m.githubUsername ? `https://github.com/${m.githubUsername}` : "",
+          github: m.githubUsername
+            ? `https://github.com/${m.githubUsername}`
+            : "",
           github_user: m.githubUsername ?? "",
           linkedin: m.linkedinUrl ?? "",
           tags: m.tags ?? "",
@@ -190,16 +208,32 @@ export const adminRouter = createTRPCRouter({
       });
 
       if (input.dryRun) {
-        return { dryRun: true, memberCount: members.length, newIdAssignments: idAssignments.length, preview: membersJson };
+        return {
+          dryRun: true,
+          memberCount: members.length,
+          newIdAssignments: idAssignments.length,
+          preview: membersJson,
+        };
       }
 
       // 4. Get base branch commit SHA + tree SHA
-      const branchRes = await fetch(`${GH}/repos/${REPO}/git/ref/heads/${BASE_BRANCH}`, { headers: ghHeaders });
-      if (!branchRes.ok) throw new Error(`GitHub: could not get branch — ${await branchRes.text()}`);
-      const branchData = (await branchRes.json()) as { object: { sha: string } };
+      const branchRes = await fetch(
+        `${GH}/repos/${REPO}/git/ref/heads/${BASE_BRANCH}`,
+        { headers: ghHeaders },
+      );
+      if (!branchRes.ok)
+        throw new Error(
+          `GitHub: could not get branch — ${await branchRes.text()}`,
+        );
+      const branchData = (await branchRes.json()) as {
+        object: { sha: string };
+      };
       const baseSha = branchData.object.sha;
 
-      const commitRes = await fetch(`${GH}/repos/${REPO}/git/commits/${baseSha}`, { headers: ghHeaders });
+      const commitRes = await fetch(
+        `${GH}/repos/${REPO}/git/commits/${baseSha}`,
+        { headers: ghHeaders },
+      );
       const commitData = (await commitRes.json()) as { tree: { sha: string } };
       const baseTreeSha = commitData.tree.sha;
 
@@ -210,10 +244,19 @@ export const adminRouter = createTRPCRouter({
         headers: ghHeaders,
         body: JSON.stringify({ ref: `refs/heads/${branchName}`, sha: baseSha }),
       });
-      if (!createBranchRes.ok) throw new Error(`GitHub: could not create branch — ${await createBranchRes.text()}`);
+      if (!createBranchRes.ok)
+        throw new Error(
+          `GitHub: could not create branch — ${await createBranchRes.text()}`,
+        );
 
       // 6. Create blobs for member images and build tree
-      const treeItems: Array<{ path: string; mode: string; type: string; sha?: string; content?: string }> = [];
+      const treeItems: Array<{
+        path: string;
+        mode: string;
+        type: string;
+        sha?: string;
+        content?: string;
+      }> = [];
 
       for (const m of members) {
         if (!m.image) continue;
@@ -254,7 +297,10 @@ export const adminRouter = createTRPCRouter({
         headers: ghHeaders,
         body: JSON.stringify({ base_tree: baseTreeSha, tree: treeItems }),
       });
-      if (!treeRes.ok) throw new Error(`GitHub: could not create tree — ${await treeRes.text()}`);
+      if (!treeRes.ok)
+        throw new Error(
+          `GitHub: could not create tree — ${await treeRes.text()}`,
+        );
       const treeData = (await treeRes.json()) as { sha: string };
 
       // 8. Create commit
@@ -267,7 +313,10 @@ export const adminRouter = createTRPCRouter({
           parents: [baseSha],
         }),
       });
-      if (!newCommitRes.ok) throw new Error(`GitHub: could not create commit — ${await newCommitRes.text()}`);
+      if (!newCommitRes.ok)
+        throw new Error(
+          `GitHub: could not create commit — ${await newCommitRes.text()}`,
+        );
       const newCommitData = (await newCommitRes.json()) as { sha: string };
 
       // 9. Update branch ref
@@ -288,8 +337,12 @@ export const adminRouter = createTRPCRouter({
           base: BASE_BRANCH,
         }),
       });
-      if (!prRes.ok) throw new Error(`GitHub: could not create PR — ${await prRes.text()}`);
-      const prData = (await prRes.json()) as { html_url: string; number: number };
+      if (!prRes.ok)
+        throw new Error(`GitHub: could not create PR — ${await prRes.text()}`);
+      const prData = (await prRes.json()) as {
+        html_url: string;
+        number: number;
+      };
 
       return {
         dryRun: false,
@@ -297,7 +350,8 @@ export const adminRouter = createTRPCRouter({
         prNumber: prData.number,
         branchName,
         memberCount: members.length,
-        imagesUploaded: treeItems.filter((t) => t.path.startsWith("src/images")).length,
+        imagesUploaded: treeItems.filter((t) => t.path.startsWith("src/images"))
+          .length,
         newIdAssignments: idAssignments.length,
       };
     }),
@@ -315,7 +369,8 @@ export const adminRouter = createTRPCRouter({
         where: { id: input.editId },
       });
       if (!edit) throw new Error("Profile edit not found");
-      if (edit.status !== "PENDING") throw new Error("Edit is no longer pending");
+      if (edit.status !== "PENDING")
+        throw new Error("Edit is no longer pending");
 
       await ctx.db.$transaction(async (tx) => {
         if (input.decision === "APPROVED") {
@@ -326,10 +381,16 @@ export const adminRouter = createTRPCRouter({
               ...(edit.name !== null && { name: edit.name }),
               ...(edit.phone !== null && { phone: edit.phone }),
               ...(edit.bio !== null && { bio: edit.bio }),
-              ...(edit.githubUsername !== null && { githubUsername: edit.githubUsername }),
-              ...(edit.linkedinUrl !== null && { linkedinUrl: edit.linkedinUrl }),
+              ...(edit.githubUsername !== null && {
+                githubUsername: edit.githubUsername,
+              }),
+              ...(edit.linkedinUrl !== null && {
+                linkedinUrl: edit.linkedinUrl,
+              }),
               ...(edit.subTeam !== null && { subTeam: edit.subTeam }),
-              ...(edit.graduationDate !== null && { graduationDate: edit.graduationDate }),
+              ...(edit.graduationDate !== null && {
+                graduationDate: edit.graduationDate,
+              }),
             },
           });
         }
