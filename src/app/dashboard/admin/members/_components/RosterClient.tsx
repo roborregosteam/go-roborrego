@@ -50,6 +50,11 @@ export function RosterClient() {
     updateMember.mutate({ id, [field]: value || undefined });
   }
 
+  function handleWebIdChange(id: string, value: string) {
+    const parsed = parseInt(value, 10);
+    updateMember.mutate({ id, webId: value && parsed > 0 ? parsed : undefined });
+  }
+
   function closePanel() {
     setPanel(null);
     void utils.member.getRoster.invalidate();
@@ -134,6 +139,7 @@ export function RosterClient() {
               <tr className="border-b border-gray-200 bg-gray-50 text-left">
                 <th className="px-4 py-3 font-medium text-gray-600">Member</th>
                 <th className="px-4 py-3 font-medium text-gray-600">Sub-team</th>
+                <th className="px-4 py-3 font-medium text-gray-600">Web ID</th>
                 <th className="px-4 py-3 font-medium text-gray-600">Role</th>
                 <th className="px-4 py-3 font-medium text-gray-600">Status</th>
                 <th className="px-4 py-3 font-medium text-gray-600">Attendance</th>
@@ -148,6 +154,7 @@ export function RosterClient() {
                   key={member.id}
                   member={member}
                   onFieldChange={handleFieldChange}
+                  onWebIdChange={handleWebIdChange}
                   isSaving={updateMember.isPending}
                 />
               ))}
@@ -162,13 +169,16 @@ export function RosterClient() {
 function MemberRow({
   member,
   onFieldChange,
+  onWebIdChange,
   isSaving,
 }: {
   member: RosterMember;
   onFieldChange: (id: string, field: "role" | "status" | "subTeam", value: string) => void;
+  onWebIdChange: (id: string, value: string) => void;
   isSaving: boolean;
 }) {
   const [subTeamInput, setSubTeamInput] = useState(member.subTeam ?? "");
+  const [webIdInput, setWebIdInput] = useState(member.webId !== null ? String(member.webId) : "");
 
   return (
     <tr className="border-b border-gray-100 last:border-0 hover:bg-gray-50">
@@ -208,6 +218,23 @@ function MemberRow({
           }}
           placeholder="—"
           className="w-28 rounded border border-transparent hover:border-gray-300 focus:border-blue-400 px-1.5 py-0.5 text-xs focus:outline-none bg-transparent focus:bg-white"
+        />
+      </td>
+
+      {/* Web ID inline edit */}
+      <td className="px-4 py-3">
+        <input
+          type="number"
+          min={1}
+          value={webIdInput}
+          onChange={(e) => setWebIdInput(e.target.value)}
+          onBlur={() => {
+            if (webIdInput !== (member.webId !== null ? String(member.webId) : "")) {
+              onWebIdChange(member.id, webIdInput);
+            }
+          }}
+          placeholder="—"
+          className="w-16 rounded border border-transparent hover:border-gray-300 focus:border-blue-400 px-1.5 py-0.5 text-xs focus:outline-none bg-transparent focus:bg-white"
         />
       </td>
 

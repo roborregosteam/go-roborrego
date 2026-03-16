@@ -176,6 +176,7 @@ const TOOLS = [
         semesters: { type: "number" },
         tags: { type: "string", description: "Comma-separated skill tags" },
         excludeFromExport: { type: "boolean" },
+        webId: { type: "number", description: "Export order ID (unique positive integer)" },
         imageBase64: { type: "string", description: "Avatar image as base64" },
         imageContentType: { type: "string", description: "MIME type, e.g. image/jpeg" },
       },
@@ -203,6 +204,7 @@ const TOOLS = [
         semesters: { type: "number" },
         tags: { type: "string", description: "Comma-separated skill tags" },
         excludeFromExport: { type: "boolean" },
+        webId: { type: "number", description: "Export order ID (unique positive integer)" },
         imageBase64: { type: "string", description: "Avatar image as base64" },
         imageContentType: { type: "string", description: "MIME type, e.g. image/jpeg" },
       },
@@ -544,6 +546,7 @@ async function callTool(
           semesters: (args.semesters as number) ?? undefined,
           tags: (args.tags as string) ?? undefined,
           excludeFromExport: (args.excludeFromExport as boolean) ?? undefined,
+          webId: (args.webId as number) ?? undefined,
         },
         select: { id: true, email: true, name: true, lastname: true, role: true, status: true, subTeam: true },
       });
@@ -577,6 +580,7 @@ async function callTool(
           ...(args.semesters !== undefined && { semesters: args.semesters as number }),
           ...(args.tags !== undefined && { tags: args.tags as string }),
           ...(args.excludeFromExport !== undefined && { excludeFromExport: args.excludeFromExport as boolean }),
+          ...(args.webId !== undefined && { webId: args.webId as number }),
         },
         select: { id: true, email: true, name: true, lastname: true, role: true, status: true, subTeam: true },
       });
