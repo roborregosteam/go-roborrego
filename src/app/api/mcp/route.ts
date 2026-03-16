@@ -20,7 +20,11 @@ import { supabaseAdmin } from "~/lib/supabase-admin";
 import { db } from "~/server/db";
 import { env } from "~/env.js";
 
-async function uploadAvatar(userId: string, imageBase64: string, contentType: string): Promise<string> {
+async function uploadAvatar(
+  userId: string,
+  imageBase64: string,
+  contentType: string,
+): Promise<string> {
   const ext = contentType.split("/")[1] ?? "jpg";
   const path = `${userId}.${ext}`;
   const buffer = Buffer.from(imageBase64, "base64");
@@ -89,7 +93,8 @@ const TOOLS = [
   },
   {
     name: "list_projects",
-    description: "List projects. Non-admins only see public projects they are a member of.",
+    description:
+      "List projects. Non-admins only see public projects they are a member of.",
     inputSchema: {
       type: "object",
       properties: {
@@ -131,17 +136,20 @@ const TOOLS = [
   },
   {
     name: "get_workplan_leaderboard",
-    description: "Get the work plan points leaderboard for the active semester.",
+    description:
+      "Get the work plan points leaderboard for the active semester.",
     inputSchema: { type: "object", properties: {} },
   },
   {
     name: "get_active_semester",
-    description: "Get the active semester with activities and completion stats.",
+    description:
+      "Get the active semester with activities and completion stats.",
     inputSchema: { type: "object", properties: {} },
   },
   {
     name: "create_task",
-    description: "Create a task in a project. Caller must be a project member or admin.",
+    description:
+      "Create a task in a project. Caller must be a project member or admin.",
     inputSchema: {
       type: "object",
       required: ["projectId", "title"],
@@ -150,7 +158,10 @@ const TOOLS = [
         title: { type: "string" },
         description: { type: "string" },
         priority: { type: "string", enum: ["LOW", "MEDIUM", "HIGH", "URGENT"] },
-        status: { type: "string", enum: ["TODO", "IN_PROGRESS", "IN_REVIEW", "DONE"] },
+        status: {
+          type: "string",
+          enum: ["TODO", "IN_PROGRESS", "IN_REVIEW", "DONE"],
+        },
       },
     },
   },
@@ -176,15 +187,22 @@ const TOOLS = [
         semesters: { type: "number" },
         tags: { type: "string", description: "Comma-separated skill tags" },
         excludeFromExport: { type: "boolean" },
-        webId: { type: "number", description: "Export order ID (unique positive integer)" },
+        webId: {
+          type: "number",
+          description: "Export order ID (unique positive integer)",
+        },
         imageBase64: { type: "string", description: "Avatar image as base64" },
-        imageContentType: { type: "string", description: "MIME type, e.g. image/jpeg" },
+        imageContentType: {
+          type: "string",
+          description: "MIME type, e.g. image/jpeg",
+        },
       },
     },
   },
   {
     name: "update_member",
-    description: "Update profile fields for an existing member. Only provided fields are changed. Admin only.",
+    description:
+      "Update profile fields for an existing member. Only provided fields are changed. Admin only.",
     inputSchema: {
       type: "object",
       required: ["email"],
@@ -204,9 +222,15 @@ const TOOLS = [
         semesters: { type: "number" },
         tags: { type: "string", description: "Comma-separated skill tags" },
         excludeFromExport: { type: "boolean" },
-        webId: { type: "number", description: "Export order ID (unique positive integer)" },
+        webId: {
+          type: "number",
+          description: "Export order ID (unique positive integer)",
+        },
         imageBase64: { type: "string", description: "Avatar image as base64" },
-        imageContentType: { type: "string", description: "MIME type, e.g. image/jpeg" },
+        imageContentType: {
+          type: "string",
+          description: "MIME type, e.g. image/jpeg",
+        },
       },
     },
   },
@@ -242,13 +266,17 @@ const TOOLS = [
         name: { type: "string" },
         startDate: { type: "string", description: "ISO date string" },
         endDate: { type: "string", description: "ISO date string" },
-        setActive: { type: "boolean", description: "Make this the active semester (default false)" },
+        setActive: {
+          type: "boolean",
+          description: "Make this the active semester (default false)",
+        },
       },
     },
   },
   {
     name: "set_active_semester",
-    description: "Set the active semester (deactivates all others). Admin only.",
+    description:
+      "Set the active semester (deactivates all others). Admin only.",
     inputSchema: {
       type: "object",
       required: ["semesterId"],
@@ -261,7 +289,10 @@ const TOOLS = [
     inputSchema: {
       type: "object",
       properties: {
-        semesterId: { type: "string", description: "Defaults to active semester" },
+        semesterId: {
+          type: "string",
+          description: "Defaults to active semester",
+        },
       },
     },
   },
@@ -297,36 +328,48 @@ const TOOLS = [
   },
   {
     name: "get_pending_completions",
-    description: "List work plan completions awaiting admin review. Admin only.",
+    description:
+      "List work plan completions awaiting admin review. Admin only.",
     inputSchema: {
       type: "object",
       properties: {
-        semesterId: { type: "string", description: "Defaults to active semester" },
+        semesterId: {
+          type: "string",
+          description: "Defaults to active semester",
+        },
       },
     },
   },
   {
     name: "review_completion",
-    description: "Approve or reject a work plan completion submission. Admin only.",
+    description:
+      "Approve or reject a work plan completion submission. Admin only.",
     inputSchema: {
       type: "object",
       required: ["completionId", "decision"],
       properties: {
         completionId: { type: "string" },
         decision: { type: "string", enum: ["APPROVED", "REJECTED"] },
-        adminMessage: { type: "string", description: "Optional feedback to member" },
+        adminMessage: {
+          type: "string",
+          description: "Optional feedback to member",
+        },
       },
     },
   },
   {
     name: "get_member_workplan_summary",
-    description: "Get a specific member's work plan progress for the active semester. Admin only.",
+    description:
+      "Get a specific member's work plan progress for the active semester. Admin only.",
     inputSchema: {
       type: "object",
       required: ["userId"],
       properties: {
         userId: { type: "string" },
-        semesterId: { type: "string", description: "Defaults to active semester" },
+        semesterId: {
+          type: "string",
+          description: "Defaults to active semester",
+        },
       },
     },
   },
@@ -357,15 +400,26 @@ async function callTool(
   switch (name) {
     case "list_members": {
       const where: Prisma.UserWhereInput = {};
-      if (args.status) where.status = args.status as Prisma.EnumMemberStatusFilter;
+      if (args.status)
+        where.status = args.status as Prisma.EnumMemberStatusFilter;
       if (args.subTeam) where.subTeam = args.subTeam as string;
       if (args.role) where.role = args.role as Prisma.EnumRoleFilter;
       const members = await db.user.findMany({
         where,
         select: {
-          id: true, name: true, email: true,
-          role: true, status: true, subTeam: true,
-          bio: true, githubUsername: true, joinDate: true, lastLoginAt: true,
+          id: true,
+          name: true,
+          email: true,
+          role: true,
+          status: true,
+          subTeam: true,
+          bio: true,
+          githubUsername: true,
+          joinDate: true,
+          lastLoginAt: true,
+          webId: true,
+          linkedinUrl: true,
+          graduationDate: true,
         },
         orderBy: { name: "asc" },
       });
@@ -398,7 +452,9 @@ async function callTool(
         include: {
           members: {
             include: {
-              user: { select: { id: true, name: true, email: true, subTeam: true } },
+              user: {
+                select: { id: true, name: true, email: true, subTeam: true },
+              },
             },
           },
           tasks: {
@@ -437,55 +493,106 @@ async function callTool(
     }
 
     case "get_attendance_report": {
-      const startDate = args.startDate ? new Date(args.startDate as string) : undefined;
-      const endDate = args.endDate ? new Date(args.endDate as string) : undefined;
+      const startDate = args.startDate
+        ? new Date(args.startDate as string)
+        : undefined;
+      const endDate = args.endDate
+        ? new Date(args.endDate as string)
+        : undefined;
       const [attendances, totalMeetings] = await Promise.all([
         db.attendance.findMany({
           where: {
-            ...(startDate ?? endDate
-              ? { meeting: { startTime: { ...(startDate && { gte: startDate }), ...(endDate && { lte: endDate }) } } }
+            ...((startDate ?? endDate)
+              ? {
+                  meeting: {
+                    startTime: {
+                      ...(startDate && { gte: startDate }),
+                      ...(endDate && { lte: endDate }),
+                    },
+                  },
+                }
               : {}),
-            ...(args.subTeam ? { user: { subTeam: args.subTeam as string } } : {}),
+            ...(args.subTeam
+              ? { user: { subTeam: args.subTeam as string } }
+              : {}),
           },
           include: {
-            user: { select: { id: true, name: true, email: true, subTeam: true } },
+            user: {
+              select: { id: true, name: true, email: true, subTeam: true },
+            },
           },
         }),
         db.meeting.count({
           where: {
-            ...(startDate ?? endDate
-              ? { startTime: { ...(startDate && { gte: startDate }), ...(endDate && { lte: endDate }) } }
+            ...((startDate ?? endDate)
+              ? {
+                  startTime: {
+                    ...(startDate && { gte: startDate }),
+                    ...(endDate && { lte: endDate }),
+                  },
+                }
               : {}),
           },
         }),
       ]);
-      const byMember = new Map<string, { user: (typeof attendances)[0]["user"]; attended: number; late: number }>();
+      const byMember = new Map<
+        string,
+        {
+          user: (typeof attendances)[0]["user"];
+          attended: number;
+          late: number;
+        }
+      >();
       for (const a of attendances) {
         const entry = byMember.get(a.userId);
-        if (entry) { entry.attended++; if (a.isLate) entry.late++; }
-        else byMember.set(a.userId, { user: a.user, attended: 1, late: a.isLate ? 1 : 0 });
+        if (entry) {
+          entry.attended++;
+          if (a.isLate) entry.late++;
+        } else
+          byMember.set(a.userId, {
+            user: a.user,
+            attended: 1,
+            late: a.isLate ? 1 : 0,
+          });
       }
       const report = Array.from(byMember.values())
-        .map((e) => ({ ...e.user, attended: e.attended, late: e.late, rate: totalMeetings > 0 ? Math.round((e.attended / totalMeetings) * 100) : 0 }))
+        .map((e) => ({
+          ...e.user,
+          attended: e.attended,
+          late: e.late,
+          rate:
+            totalMeetings > 0
+              ? Math.round((e.attended / totalMeetings) * 100)
+              : 0,
+        }))
         .sort((a, b) => b.rate - a.rate);
       return ok({ totalMeetings, report });
     }
 
     case "get_workplan_leaderboard": {
-      const semester = await db.semester.findFirst({ where: { isActive: true } });
-      if (!semester) return ok({ message: "No active semester", leaderboard: [] });
+      const semester = await db.semester.findFirst({
+        where: { isActive: true },
+      });
+      if (!semester)
+        return ok({ message: "No active semester", leaderboard: [] });
       const completions = await db.workPlanCompletion.findMany({
         where: { status: "APPROVED", activity: { semesterId: semester.id } },
         include: {
-          user: { select: { id: true, name: true, email: true, subTeam: true } },
+          user: {
+            select: { id: true, name: true, email: true, subTeam: true },
+          },
           activity: { select: { points: true } },
         },
       });
-      const pointsMap = new Map<string, { user: (typeof completions)[0]["user"]; points: number }>();
+      const pointsMap = new Map<
+        string,
+        { user: (typeof completions)[0]["user"]; points: number }
+      >();
       for (const c of completions) {
         const entry = pointsMap.get(c.userId);
         if (entry) entry.points += c.activity.points;
-        else pointsMap.set(c.userId, { user: c.user, points: c.activity.points });
+        else
+          pointsMap.set(c.userId, { user: c.user, points: c.activity.points });
       }
       const leaderboard = Array.from(pointsMap.values())
         .sort((a, b) => b.points - a.points)
@@ -496,7 +603,14 @@ async function callTool(
     case "get_active_semester": {
       const semester = await db.semester.findFirst({
         where: { isActive: true },
-        include: { activities: { include: { _count: { select: { completions: true, interests: true } } }, orderBy: { isMandatory: "desc" } } },
+        include: {
+          activities: {
+            include: {
+              _count: { select: { completions: true, interests: true } },
+            },
+            orderBy: { isMandatory: "desc" },
+          },
+        },
       });
       if (!semester) return ok({ message: "No active semester" });
       return ok(semester);
@@ -507,17 +621,26 @@ async function callTool(
         return forbidden("VIEWERs cannot create tasks");
       if (user.role !== "ADMIN") {
         const membership = await db.projectMember.findUnique({
-          where: { projectId_userId: { projectId: args.projectId as string, userId: user.id } },
+          where: {
+            projectId_userId: {
+              projectId: args.projectId as string,
+              userId: user.id,
+            },
+          },
         });
-        if (!membership) return forbidden("You are not a member of this project");
+        if (!membership)
+          return forbidden("You are not a member of this project");
       }
       const task = await db.task.create({
         data: {
           projectId: args.projectId as string,
           title: args.title as string,
           description: (args.description as string) ?? undefined,
-          priority: (args.priority as "LOW" | "MEDIUM" | "HIGH" | "URGENT") ?? "MEDIUM",
-          status: (args.status as "TODO" | "IN_PROGRESS" | "IN_REVIEW" | "DONE") ?? "TODO",
+          priority:
+            (args.priority as "LOW" | "MEDIUM" | "HIGH" | "URGENT") ?? "MEDIUM",
+          status:
+            (args.status as "TODO" | "IN_PROGRESS" | "IN_REVIEW" | "DONE") ??
+            "TODO",
           createdBy: user.id,
         },
       });
@@ -525,10 +648,12 @@ async function callTool(
     }
 
     case "register_member": {
-      if (user.role !== "ADMIN") return forbidden("Only ADMINs can register members");
+      if (user.role !== "ADMIN")
+        return forbidden("Only ADMINs can register members");
       const email = (args.email as string).toLowerCase();
       const existing = await db.user.findUnique({ where: { email } });
-      if (existing) return toolError(`A user with email ${email} already exists`);
+      if (existing)
+        return toolError(`A user with email ${email} already exists`);
       const member = await db.user.create({
         data: {
           email,
@@ -541,59 +666,122 @@ async function callTool(
           bio: (args.bio as string) ?? undefined,
           githubUsername: (args.githubUsername as string) ?? undefined,
           linkedinUrl: (args.linkedinUrl as string) ?? undefined,
-          graduationDate: args.graduationDate ? new Date(args.graduationDate as string) : undefined,
+          graduationDate: args.graduationDate
+            ? new Date(args.graduationDate as string)
+            : undefined,
           subtitle: (args.subtitle as string) ?? undefined,
           semesters: (args.semesters as number) ?? undefined,
           tags: (args.tags as string) ?? undefined,
           excludeFromExport: (args.excludeFromExport as boolean) ?? undefined,
           webId: (args.webId as number) ?? undefined,
         },
-        select: { id: true, email: true, name: true, lastname: true, role: true, status: true, subTeam: true },
+        select: {
+          id: true,
+          email: true,
+          name: true,
+          lastname: true,
+          role: true,
+          status: true,
+          subTeam: true,
+        },
       });
       if (args.imageBase64 && args.imageContentType) {
-        const imageUrl = await uploadAvatar(member.id, args.imageBase64 as string, args.imageContentType as string);
-        await db.user.update({ where: { id: member.id }, data: { image: imageUrl } });
-        return ok({ message: "Member registered", member: { ...member, image: imageUrl } });
+        const imageUrl = await uploadAvatar(
+          member.id,
+          args.imageBase64 as string,
+          args.imageContentType as string,
+        );
+        await db.user.update({
+          where: { id: member.id },
+          data: { image: imageUrl },
+        });
+        return ok({
+          message: "Member registered",
+          member: { ...member, image: imageUrl },
+        });
       }
       return ok({ message: "Member registered", member });
     }
 
     case "update_member": {
-      if (user.role !== "ADMIN") return forbidden("Only ADMINs can update members");
+      if (user.role !== "ADMIN")
+        return forbidden("Only ADMINs can update members");
       const email = (args.email as string).toLowerCase();
-      const existing = await db.user.findUnique({ where: { email }, select: { id: true } });
+      const existing = await db.user.findUnique({
+        where: { email },
+        select: { id: true },
+      });
       if (!existing) return toolError(`No user found with email ${email}`);
       const member = await db.user.update({
         where: { email },
         data: {
           ...(args.name !== undefined && { name: args.name as string }),
-          ...(args.lastname !== undefined && { lastname: args.lastname as string }),
-          ...(args.role !== undefined && { role: args.role as "VIEWER" | "MEMBER" | "ADMIN" }),
-          ...(args.status !== undefined && { status: args.status as "ACTIVE" | "INACTIVE" | "ALUMNI" }),
-          ...(args.subTeam !== undefined && { subTeam: args.subTeam as string }),
+          ...(args.lastname !== undefined && {
+            lastname: args.lastname as string,
+          }),
+          ...(args.role !== undefined && {
+            role: args.role as "VIEWER" | "MEMBER" | "ADMIN",
+          }),
+          ...(args.status !== undefined && {
+            status: args.status as "ACTIVE" | "INACTIVE" | "ALUMNI",
+          }),
+          ...(args.subTeam !== undefined && {
+            subTeam: args.subTeam as string,
+          }),
           ...(args.phone !== undefined && { phone: args.phone as string }),
           ...(args.bio !== undefined && { bio: args.bio as string }),
-          ...(args.githubUsername !== undefined && { githubUsername: args.githubUsername as string }),
-          ...(args.linkedinUrl !== undefined && { linkedinUrl: args.linkedinUrl as string }),
-          ...(args.graduationDate !== undefined && { graduationDate: new Date(args.graduationDate as string) }),
-          ...(args.subtitle !== undefined && { subtitle: args.subtitle as string }),
-          ...(args.semesters !== undefined && { semesters: args.semesters as number }),
+          ...(args.githubUsername !== undefined && {
+            githubUsername: args.githubUsername as string,
+          }),
+          ...(args.linkedinUrl !== undefined && {
+            linkedinUrl: args.linkedinUrl as string,
+          }),
+          ...(args.graduationDate !== undefined && {
+            graduationDate: new Date(args.graduationDate as string),
+          }),
+          ...(args.subtitle !== undefined && {
+            subtitle: args.subtitle as string,
+          }),
+          ...(args.semesters !== undefined && {
+            semesters: args.semesters as number,
+          }),
           ...(args.tags !== undefined && { tags: args.tags as string }),
-          ...(args.excludeFromExport !== undefined && { excludeFromExport: args.excludeFromExport as boolean }),
+          ...(args.excludeFromExport !== undefined && {
+            excludeFromExport: args.excludeFromExport as boolean,
+          }),
           ...(args.webId !== undefined && { webId: args.webId as number }),
         },
-        select: { id: true, email: true, name: true, lastname: true, role: true, status: true, subTeam: true },
+        select: {
+          id: true,
+          email: true,
+          name: true,
+          lastname: true,
+          role: true,
+          status: true,
+          subTeam: true,
+        },
       });
       if (args.imageBase64 && args.imageContentType) {
-        const imageUrl = await uploadAvatar(member.id, args.imageBase64 as string, args.imageContentType as string);
-        await db.user.update({ where: { id: member.id }, data: { image: imageUrl } });
-        return ok({ message: "Member updated", member: { ...member, image: imageUrl } });
+        const imageUrl = await uploadAvatar(
+          member.id,
+          args.imageBase64 as string,
+          args.imageContentType as string,
+        );
+        await db.user.update({
+          where: { id: member.id },
+          data: { image: imageUrl },
+        });
+        return ok({
+          message: "Member updated",
+          member: { ...member, image: imageUrl },
+        });
       }
       return ok({ message: "Member updated", member });
     }
 
     case "create_meeting": {
-      if (user.role !== "ADMIN") return forbidden("Only ADMINs can create meetings");
+      if (user.role !== "ADMIN")
+        return forbidden("Only ADMINs can create meetings");
       const meeting = await db.meeting.create({
         data: {
           title: args.title as string,
@@ -611,7 +799,8 @@ async function callTool(
     // ── Work plan admin tools ──────────────────────────────────────────────
 
     case "list_semesters": {
-      if (user.role !== "ADMIN") return forbidden("Only ADMINs can list semesters");
+      if (user.role !== "ADMIN")
+        return forbidden("Only ADMINs can list semesters");
       const semesters = await db.semester.findMany({
         include: { _count: { select: { activities: true } } },
         orderBy: { startDate: "desc" },
@@ -620,10 +809,12 @@ async function callTool(
     }
 
     case "create_semester": {
-      if (user.role !== "ADMIN") return forbidden("Only ADMINs can create semesters");
+      if (user.role !== "ADMIN")
+        return forbidden("Only ADMINs can create semesters");
       const setActive = args.setActive === true;
       const semester = await db.$transaction(async (tx) => {
-        if (setActive) await tx.semester.updateMany({ data: { isActive: false } });
+        if (setActive)
+          await tx.semester.updateMany({ data: { isActive: false } });
         return tx.semester.create({
           data: {
             name: args.name as string,
@@ -637,7 +828,8 @@ async function callTool(
     }
 
     case "set_active_semester": {
-      if (user.role !== "ADMIN") return forbidden("Only ADMINs can change the active semester");
+      if (user.role !== "ADMIN")
+        return forbidden("Only ADMINs can change the active semester");
       const semester = await db.$transaction(async (tx) => {
         await tx.semester.updateMany({ data: { isActive: false } });
         return tx.semester.update({
@@ -649,11 +841,16 @@ async function callTool(
     }
 
     case "list_activities": {
-      if (user.role !== "ADMIN") return forbidden("Only ADMINs can list activities");
+      if (user.role !== "ADMIN")
+        return forbidden("Only ADMINs can list activities");
       let semesterId = args.semesterId as string | undefined;
       if (!semesterId) {
-        const active = await db.semester.findFirst({ where: { isActive: true }, select: { id: true } });
-        if (!active) return ok({ message: "No active semester", activities: [] });
+        const active = await db.semester.findFirst({
+          where: { isActive: true },
+          select: { id: true },
+        });
+        if (!active)
+          return ok({ message: "No active semester", activities: [] });
         semesterId = active.id;
       }
       const activities = await db.workPlanActivity.findMany({
@@ -665,7 +862,8 @@ async function callTool(
     }
 
     case "create_activity": {
-      if (user.role !== "ADMIN") return forbidden("Only ADMINs can create activities");
+      if (user.role !== "ADMIN")
+        return forbidden("Only ADMINs can create activities");
       const activity = await db.workPlanActivity.create({
         data: {
           semesterId: args.semesterId as string,
@@ -679,7 +877,8 @@ async function callTool(
     }
 
     case "update_activity": {
-      if (user.role !== "ADMIN") return forbidden("Only ADMINs can update activities");
+      if (user.role !== "ADMIN")
+        return forbidden("Only ADMINs can update activities");
       const data: Record<string, unknown> = {};
       if (args.name !== undefined) data.name = args.name;
       if (args.description !== undefined) data.description = args.description;
@@ -693,17 +892,24 @@ async function callTool(
     }
 
     case "get_pending_completions": {
-      if (user.role !== "ADMIN") return forbidden("Only ADMINs can view pending completions");
+      if (user.role !== "ADMIN")
+        return forbidden("Only ADMINs can view pending completions");
       let semesterId = args.semesterId as string | undefined;
       if (!semesterId) {
-        const active = await db.semester.findFirst({ where: { isActive: true }, select: { id: true } });
-        if (!active) return ok({ message: "No active semester", completions: [] });
+        const active = await db.semester.findFirst({
+          where: { isActive: true },
+          select: { id: true },
+        });
+        if (!active)
+          return ok({ message: "No active semester", completions: [] });
         semesterId = active.id;
       }
       const completions = await db.workPlanCompletion.findMany({
         where: { status: "PENDING", activity: { semesterId } },
         include: {
-          user: { select: { id: true, name: true, email: true, subTeam: true } },
+          user: {
+            select: { id: true, name: true, email: true, subTeam: true },
+          },
           activity: { select: { id: true, name: true, points: true } },
         },
         orderBy: { createdAt: "asc" },
@@ -712,7 +918,8 @@ async function callTool(
     }
 
     case "review_completion": {
-      if (user.role !== "ADMIN") return forbidden("Only ADMINs can review completions");
+      if (user.role !== "ADMIN")
+        return forbidden("Only ADMINs can review completions");
       const completion = await db.workPlanCompletion.update({
         where: { id: args.completionId as string },
         data: {
@@ -724,15 +931,21 @@ async function callTool(
           activity: { select: { name: true, points: true } },
         },
       });
-      return ok({ message: `Completion ${args.decision as string}`, completion });
+      return ok({
+        message: `Completion ${args.decision as string}`,
+        completion,
+      });
     }
 
     case "get_member_workplan_summary": {
-      if (user.role !== "ADMIN") return forbidden("Only ADMINs can view member summaries");
+      if (user.role !== "ADMIN")
+        return forbidden("Only ADMINs can view member summaries");
       let semesterId = args.semesterId as string | undefined;
       let semesterName = "";
       if (!semesterId) {
-        const active = await db.semester.findFirst({ where: { isActive: true } });
+        const active = await db.semester.findFirst({
+          where: { isActive: true },
+        });
         if (!active) return ok({ message: "No active semester" });
         semesterId = active.id;
         semesterName = active.name;
@@ -741,11 +954,19 @@ async function callTool(
         semesterName = sem?.name ?? semesterId;
       }
       const [member, activities, completions, interests] = await Promise.all([
-        db.user.findUnique({ where: { id: args.userId as string }, select: { id: true, name: true, email: true, subTeam: true } }),
-        db.workPlanActivity.findMany({ where: { semesterId }, orderBy: { isMandatory: "desc" } }),
+        db.user.findUnique({
+          where: { id: args.userId as string },
+          select: { id: true, name: true, email: true, subTeam: true },
+        }),
+        db.workPlanActivity.findMany({
+          where: { semesterId },
+          orderBy: { isMandatory: "desc" },
+        }),
         db.workPlanCompletion.findMany({
           where: { userId: args.userId as string, activity: { semesterId } },
-          include: { activity: { select: { id: true, name: true, points: true } } },
+          include: {
+            activity: { select: { id: true, name: true, points: true } },
+          },
         }),
         db.workPlanInterest.findMany({
           where: { userId: args.userId as string, activity: { semesterId } },
@@ -766,7 +987,12 @@ async function callTool(
         interested: interestSet.has(a.id),
         completion: completionMap.get(a.id) ?? null,
       }));
-      return ok({ semester: semesterName, member, approvedPoints, activities: activitySummary });
+      return ok({
+        semester: semesterName,
+        member,
+        approvedPoints,
+        activities: activitySummary,
+      });
     }
 
     default:
