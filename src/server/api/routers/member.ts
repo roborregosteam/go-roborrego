@@ -213,7 +213,7 @@ export const memberRouter = createTRPCRouter({
   registerMember: adminProcedure
     .input(
       z.object({
-        email: z.string().email(),
+        email: z.string().email().transform((e) => e.toLowerCase()),
         name: z.string().min(1).optional(),
         role: z.enum(["VIEWER", "MEMBER", "ADMIN"]).default("MEMBER"),
         subTeam: z.string().optional(),
@@ -245,7 +245,7 @@ export const memberRouter = createTRPCRouter({
       z.array(
         z.object({
           name: z.string().min(1),
-          email: z.string().email(),
+          email: z.string().email().transform((e) => e.toLowerCase()),
           role: z.enum(["VIEWER", "MEMBER", "ADMIN"]).default("MEMBER"),
           status: z.enum(["ACTIVE", "INACTIVE", "ALUMNI"]).default("ACTIVE"),
           subTeam: z.string().optional(),

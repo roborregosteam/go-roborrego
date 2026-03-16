@@ -35,7 +35,7 @@ export const authConfig = {
 
       // Otherwise only allow emails that have been pre-registered by an admin
       const registered = await db.user.findUnique({
-        where: { email: user.email ?? undefined },
+        where: { email: user.email?.toLowerCase() ?? undefined },
         select: { id: true },
       });
       return !!registered;
