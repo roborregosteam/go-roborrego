@@ -126,6 +126,10 @@ model User {
     semesters         Int?
     tags              String?
     excludeFromExport Boolean  @default(false)
+    // Microsoft integration (tokens never exposed to client)
+    msAccessToken  String?
+    msRefreshToken String?
+    msTokenExpiry  DateTime?
 
     // NextAuth relations
     accounts Account[]
@@ -262,15 +266,20 @@ model WorkPlanCompletion {
 // ─── Attendance ────────────────────────────────────────────────────────────────
 
 model Meeting {
-    id             String   @id @default(cuid())
-    title          String
-    description    String?
-    startTime      DateTime
-    duration       Int // minutes
-    checkInToken   String   @unique @default(cuid())
-    createdBy      String
-    projectId      String?
-    createdAt      DateTime @default(now())
+    id                  String   @id @default(cuid())
+    title               String
+    description         String?
+    notes               String?
+    notesAllowAttendees Boolean  @default(false)
+    startTime           DateTime
+    duration            Int // minutes
+    checkInToken        String   @unique @default(cuid())
+    createdBy           String
+    projectId           String?
+    teamsChannelId      String?
+    teamsJoinUrl        String?
+    outlookEventId      String?
+    createdAt           DateTime @default(now())
 
     creator     User              @relation("MeetingCreator", fields: [createdBy], references: [id])
     project     Project?          @relation(fields: [projectId], references: [id], onDelete: SetNull)

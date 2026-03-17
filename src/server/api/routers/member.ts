@@ -102,8 +102,13 @@ export const memberRouter = createTRPCRouter({
       },
     });
     if (!user) return null;
-    const { profileEdits, ...rest } = user;
-    return { ...rest, pendingEdit: profileEdits[0] ?? null };
+    // Never expose raw tokens to the client — derive a boolean instead
+    const { profileEdits, msAccessToken, msRefreshToken, msTokenExpiry, ...rest } = user;
+    return {
+      ...rest,
+      pendingEdit: profileEdits[0] ?? null,
+      microsoftConnected: msRefreshToken !== null,
+    };
   }),
 
   updateProfile: protectedProcedure

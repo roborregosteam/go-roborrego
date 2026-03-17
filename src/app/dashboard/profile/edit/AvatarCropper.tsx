@@ -4,11 +4,13 @@ import { useRef, useState, useCallback } from "react";
 import ReactCrop, { centerCrop, makeAspectCrop, type Crop, type PixelCrop } from "react-image-crop";
 import "react-image-crop/dist/ReactCrop.css";
 
-const OUTPUT_SIZE = 512;
+const OUTPUT_WIDTH = 600;
+const OUTPUT_HEIGHT = 456;
+const OUTPUT_ASPECT = OUTPUT_WIDTH / OUTPUT_HEIGHT;
 
 function initialCrop(width: number, height: number): Crop {
   return centerCrop(
-    makeAspectCrop({ unit: "%", width: 90 }, 1, width, height),
+    makeAspectCrop({ unit: "%", width: 90 }, OUTPUT_ASPECT, width, height),
     width,
     height,
   );
@@ -19,8 +21,8 @@ function cropToBlob(
   pixelCrop: PixelCrop,
 ): Promise<Blob> {
   const canvas = document.createElement("canvas");
-  canvas.width = OUTPUT_SIZE;
-  canvas.height = OUTPUT_SIZE;
+  canvas.width = OUTPUT_WIDTH;
+  canvas.height = OUTPUT_HEIGHT;
   const ctx = canvas.getContext("2d")!;
 
   const scaleX = image.naturalWidth / image.width;
@@ -34,8 +36,8 @@ function cropToBlob(
     pixelCrop.height * scaleY,
     0,
     0,
-    OUTPUT_SIZE,
-    OUTPUT_SIZE,
+    OUTPUT_WIDTH,
+    OUTPUT_HEIGHT,
   );
 
   return new Promise((resolve, reject) => {
@@ -117,8 +119,7 @@ export function AvatarCropper({
                 crop={crop}
                 onChange={(c) => setCrop(c)}
                 onComplete={(c) => setCompletedCrop(c)}
-                aspect={1}
-                circularCrop
+                aspect={OUTPUT_ASPECT}
                 minWidth={50}
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -135,7 +136,7 @@ export function AvatarCropper({
 
           {srcUrl && (
             <p className="text-xs text-gray-400 text-center">
-              Drag to reposition · resize handles to adjust · output will be {OUTPUT_SIZE}×{OUTPUT_SIZE} px
+              Drag to reposition · resize handles to adjust · output will be {OUTPUT_WIDTH}×{OUTPUT_HEIGHT} px
             </p>
           )}
         </div>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 import { api } from "~/trpc/react";
 import { useUpload } from "~/lib/useUpload";
@@ -244,6 +244,10 @@ export default function EditProfilePage() {
       </form>
 
       <ApiKeySection />
+      <MicrosoftSection
+        connected={me?.microsoftConnected ?? false}
+        onDisconnect={() => void utils.member.getMe.invalidate()}
+      />
     </div>
   );
 }
@@ -354,6 +358,76 @@ function ApiKeySection() {
             </button>
           )}
         </div>
+      </div>
+    </div>
+  );
+}
+
+function MicrosoftSection({
+  connected,
+  onDisconnect,
+}: {
+  connected: boolean;
+  onDisconnect: () => void;
+}) {
+  const searchParams = useSearchParams();
+  const msConnected = searchParams.get("ms_connected") === "1";
+  const msError = searchParams.get("ms_error");
+  const [disconnecting, setDisconnecting] = useState(false);
+
+  async function handleDisconnect() {
+    setDisconnecting(true);
+    await fetch("/api/auth/microsoft/disconnect", { method: "DELETE" });
+    setDisconnecting(false);
+    onDisconnect();
+  }
+
+  return (
+    <div className="mt-6 bg-white rounded-xl border border-gray-200 shadow-sm">
+      <div className="px-6 py-5 border-b border-gray-100">
+        <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">
+          Microsoft Integration
+        </p>
+        <p className="text-sm text-gray-500 mt-1">
+          Connect your Microsoft account to create Teams meetings and Outlook
+          calendar events directly from the attendance page.
+        </p>
+      </div>
+
+      <div className="px-6 py-5 space-y-3">
+        {msConnected && (
+          <p className="text-sm text-green-700 bg-green-50 border border-green-200 rounded-lg px-3 py-2">
+            Microsoft account connected successfully.
+          </p>
+        )}
+        {msError && (
+          <p className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+            Microsoft connection failed: {msError}
+          </p>
+        )}
+
+        {connected ? (
+          <div className="flex items-center gap-3">
+            <span className="flex items-center gap-1.5 text-sm text-gray-700">
+              <span className="w-2 h-2 rounded-full bg-green-400" />
+              Microsoft account connected
+            </span>
+            <button
+              onClick={handleDisconnect}
+              disabled={disconnecting}
+              className="text-sm px-4 py-1.5 border border-red-200 text-red-600 rounded-lg hover:bg-red-50 disabled:opacity-50 transition-colors"
+            >
+              {disconnecting ? "Disconnecting…" : "Disconnect"}
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={() => { window.location.href = "/api/auth/microsoft"; }}
+            className="inline-block text-sm px-4 py-2 bg-[#0078d4] text-white rounded-lg hover:bg-[#106ebe] transition-colors"
+          >
+            Connect Microsoft Account
+          </button>
+        )}
       </div>
     </div>
   );

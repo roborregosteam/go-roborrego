@@ -1,45 +1,111 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
+import type { PrismaClient } from "../../../../generated/prisma";
 import {
-  adminProcedure,
   createTRPCRouter,
   memberProcedure,
   protectedProcedure,
+  adminProcedure,
 } from "~/server/api/trpc";
+import {
+  getMsToken,
+  getTeamsChannels,
+  createCalendarEvent,
+  postChannelMessage,
+  deleteOutlookEvent,
+} from "~/lib/microsoft-graph";
+import { env } from "~/env.js";
 
 // 15-minute grace period before a check-in is considered late
 const LATE_GRACE_MS = 15 * 60 * 1000;
+
+// ─── Permission helper ────────────────────────────────────────────────────────
+
+async function canManageMeeting(
+  db: PrismaClient,
+  meetingId: string,
+  userId: string,
+  userRole: string,
+): Promise<boolean> {
+  if (userRole === "ADMIN") return true;
+  const meeting = await db.meeting.findUnique({
+    where: { id: meetingId },
+    select: { createdBy: true, projectId: true },
+  });
+  if (!meeting) return false;
+  if (meeting.createdBy === userId) return true;
+  if (meeting.projectId) {
+    const pm = await db.projectMember.findUnique({
+      where: { projectId_userId: { projectId: meeting.projectId, userId } },
+      select: { role: true },
+    });
+    return pm?.role === "PROJECT_MANAGER";
+  }
+  return false;
+}
+
+// ─── Router ───────────────────────────────────────────────────────────────────
 
 export const attendanceRouter = createTRPCRouter({
   // ─── Meetings ───────────────────────────────────────────────────────────────
 
   getMeetings: protectedProcedure.query(async ({ ctx }) => {
-    const meetings = await ctx.db.meeting.findMany({
-      orderBy: { startTime: "desc" },
-      include: {
-        _count: { select: { attendances: true } },
-        project: { select: { id: true, name: true } },
-        attendances: {
-          where: { userId: ctx.session.user.id },
-          select: { isLate: true, checkInTime: true },
+    const userId = ctx.session.user.id;
+    const userRole = ctx.session.user.role;
+
+    const [meetings, myProjectMemberships] = await Promise.all([
+      ctx.db.meeting.findMany({
+        orderBy: { startTime: "desc" },
+        include: {
+          _count: { select: { attendances: true } },
+          project: { select: { id: true, name: true } },
+          attendances: {
+            where: { userId },
+            select: { isLate: true, checkInTime: true },
+          },
+          feedbacks: {
+            where: { userId },
+            select: { rating: true, comment: true, isAnonymous: true },
+          },
         },
-        feedbacks: {
-          where: { userId: ctx.session.user.id },
-          select: { rating: true, comment: true, isAnonymous: true },
-        },
-      },
+      }),
+      ctx.db.projectMember.findMany({
+        where: { userId },
+        select: { projectId: true, role: true },
+      }),
+    ]);
+
+    const pmMap = new Map(myProjectMemberships.map((m) => [m.projectId, m.role]));
+
+    return meetings.map(({ attendances, feedbacks, ...m }) => {
+      const isOwner = m.createdBy === userId;
+      const isPM = m.projectId ? pmMap.get(m.projectId) === "PROJECT_MANAGER" : false;
+      const canManage = userRole === "ADMIN" || isOwner || isPM;
+      const isAttendee = attendances.length > 0;
+      const canEditNotes = canManage || (m.notesAllowAttendees && isAttendee);
+
+      return {
+        ...m,
+        myAttendance: attendances[0] ?? null,
+        myFeedback: feedbacks[0] ?? null,
+        canManage,
+        canEditNotes,
+      };
     });
-    return meetings.map(({ attendances, feedbacks, ...m }) => ({
-      ...m,
-      myAttendance: attendances[0] ?? null,
-      myFeedback: feedbacks[0] ?? null,
-    }));
   }),
 
-  getMeetingDetail: adminProcedure
+  getMeetingDetail: protectedProcedure
     .input(z.object({ id: z.string() }))
     .query(async ({ ctx, input }) => {
+      const canManage = await canManageMeeting(
+        ctx.db,
+        input.id,
+        ctx.session.user.id,
+        ctx.session.user.role,
+      );
+      if (!canManage) throw new TRPCError({ code: "FORBIDDEN" });
+
       const [meeting, activeMembers] = await Promise.all([
         ctx.db.meeting.findUnique({
           where: { id: input.id },
@@ -76,7 +142,6 @@ export const attendanceRouter = createTRPCRouter({
       const checkedInIds = new Set(meeting.attendances.map((a) => a.userId));
       return {
         ...meeting,
-        // Mask user identity for anonymous feedback
         feedbacks: meeting.feedbacks.map(({ user, ...f }) => ({
           ...f,
           user: f.isAnonymous ? null : user,
@@ -90,7 +155,16 @@ export const attendanceRouter = createTRPCRouter({
       };
     }),
 
-  createMeeting: adminProcedure
+  // Returns the channels the current user can post to, or null if not connected.
+  // Returns [] if MS env vars are not configured.
+  getTeamsChannels: protectedProcedure.query(async ({ ctx }) => {
+    if (!env.MICROSOFT_CLIENT_ID) return []; // not configured
+    const token = await getMsToken(ctx.session.user.id);
+    if (!token) return null; // connected but token invalid / not linked
+    return getTeamsChannels(token);
+  }),
+
+  createMeeting: memberProcedure
     .input(
       z.object({
         title: z.string().min(1),
@@ -98,15 +172,64 @@ export const attendanceRouter = createTRPCRouter({
         startTime: z.date(),
         duration: z.number().int().positive().default(60),
         projectId: z.string().optional(),
+        teamsChannelId: z.string().optional(),
       }),
     )
-    .mutation(({ ctx, input }) => {
-      return ctx.db.meeting.create({
-        data: { ...input, createdBy: ctx.session.user.id },
+    .mutation(async ({ ctx, input }) => {
+      const { teamsChannelId, ...meetingData } = input;
+
+      const meeting = await ctx.db.meeting.create({
+        data: { ...meetingData, createdBy: ctx.session.user.id },
       });
+
+      // Optionally integrate with Teams / Outlook
+      if (teamsChannelId) {
+        try {
+          const token = await getMsToken(ctx.session.user.id);
+          if (token) {
+            // Fetch all active members as attendees
+            const members = await ctx.db.user.findMany({
+              where: { status: "ACTIVE" },
+              select: { email: true, name: true },
+            });
+
+            const attendees = members
+              .filter((m): m is typeof m & { email: string } => m.email !== null)
+              .map((m) => ({ address: m.email, name: m.name }));
+
+            const { joinUrl, eventId } = await createCalendarEvent(
+              token,
+              input.title,
+              input.description ?? null,
+              input.startTime,
+              input.duration,
+              attendees,
+            );
+
+            await postChannelMessage(
+              token,
+              teamsChannelId,
+              input.title,
+              input.startTime,
+              input.duration,
+              joinUrl,
+            );
+
+            return ctx.db.meeting.update({
+              where: { id: meeting.id },
+              data: { teamsJoinUrl: joinUrl, teamsChannelId, outlookEventId: eventId },
+            });
+          }
+        } catch (e) {
+          // Teams integration failed — meeting still created in our DB
+          console.error("[Teams] createMeeting integration failed:", e);
+        }
+      }
+
+      return meeting;
     }),
 
-  updateMeeting: adminProcedure
+  updateMeeting: protectedProcedure
     .input(
       z.object({
         id: z.string(),
@@ -115,17 +238,92 @@ export const attendanceRouter = createTRPCRouter({
         startTime: z.date().optional(),
         duration: z.number().int().positive().optional(),
         projectId: z.string().nullable().optional(),
+        notesAllowAttendees: z.boolean().optional(),
       }),
     )
-    .mutation(({ ctx, input }) => {
+    .mutation(async ({ ctx, input }) => {
+      const canManage = await canManageMeeting(
+        ctx.db,
+        input.id,
+        ctx.session.user.id,
+        ctx.session.user.role,
+      );
+      if (!canManage) throw new TRPCError({ code: "FORBIDDEN" });
       const { id, ...data } = input;
       return ctx.db.meeting.update({ where: { id }, data });
     }),
 
-  deleteMeeting: adminProcedure
+  deleteMeeting: protectedProcedure
     .input(z.object({ id: z.string() }))
-    .mutation(({ ctx, input }) => {
+    .mutation(async ({ ctx, input }) => {
+      const canManage = await canManageMeeting(
+        ctx.db,
+        input.id,
+        ctx.session.user.id,
+        ctx.session.user.role,
+      );
+      if (!canManage) throw new TRPCError({ code: "FORBIDDEN" });
+
+      // Delete Outlook event if the current user is the creator and has a token
+      const meeting = await ctx.db.meeting.findUnique({
+        where: { id: input.id },
+        select: { outlookEventId: true, createdBy: true },
+      });
+      if (meeting?.outlookEventId && meeting.createdBy === ctx.session.user.id) {
+        try {
+          const token = await getMsToken(ctx.session.user.id);
+          if (token) await deleteOutlookEvent(token, meeting.outlookEventId);
+        } catch (e) {
+          console.error("[Teams] deleteOutlookEvent failed:", e);
+        }
+      }
+
       return ctx.db.meeting.delete({ where: { id: input.id } });
+    }),
+
+  updateNotes: protectedProcedure
+    .input(
+      z.object({
+        id: z.string(),
+        notes: z.string().nullable(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const meeting = await ctx.db.meeting.findUnique({
+        where: { id: input.id },
+        select: {
+          createdBy: true,
+          projectId: true,
+          notesAllowAttendees: true,
+        },
+      });
+      if (!meeting) throw new TRPCError({ code: "NOT_FOUND" });
+
+      const canManage = await canManageMeeting(
+        ctx.db,
+        input.id,
+        ctx.session.user.id,
+        ctx.session.user.role,
+      );
+      if (!canManage) {
+        if (!meeting.notesAllowAttendees)
+          throw new TRPCError({ code: "FORBIDDEN" });
+        const attendance = await ctx.db.attendance.findUnique({
+          where: {
+            userId_meetingId: {
+              userId: ctx.session.user.id,
+              meetingId: input.id,
+            },
+          },
+          select: { id: true },
+        });
+        if (!attendance) throw new TRPCError({ code: "FORBIDDEN" });
+      }
+
+      return ctx.db.meeting.update({
+        where: { id: input.id },
+        data: { notes: input.notes },
+      });
     }),
 
   // ─── Check-in ────────────────────────────────────────────────────────────────
@@ -139,7 +337,7 @@ export const attendanceRouter = createTRPCRouter({
       if (!meeting)
         throw new TRPCError({
           code: "NOT_FOUND",
-          message: "Invalid check-in link.",
+          message: "Invalid check-in code.",
         });
 
       const now = new Date();
@@ -262,7 +460,6 @@ export const attendanceRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      // Upsert so members can update their feedback
       return ctx.db.meetingFeedback.upsert({
         where: {
           userId_meetingId: {
