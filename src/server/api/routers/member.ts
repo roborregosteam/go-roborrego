@@ -295,6 +295,51 @@ export const memberRouter = createTRPCRouter({
       };
     }),
 
+  // ─── Onboarding ─────────────────────────────────────────────────────────────
+
+  getOnboardingStatus: protectedProcedure.query(async ({ ctx }) => {
+    const user = await ctx.db.user.findUniqueOrThrow({
+      where: { id: ctx.session.user.id },
+      select: {
+        role: true,
+        bio: true,
+        phone: true,
+        githubUsername: true,
+        subTeam: true,
+        onboardingDismissed: true,
+        _count: {
+          select: { attendances: true, projectMembers: true },
+        },
+      },
+    });
+
+    return {
+      dismissed: user.onboardingDismissed,
+      role: user.role,
+      tasks: {
+        profileComplete: !!(user.bio && user.phone && user.subTeam),
+        githubConnected: !!user.githubUsername,
+        teamAccessGranted: user.role !== "VIEWER",
+        joinedProject: user._count.projectMembers > 0,
+        attendedMeeting: user._count.attendances > 0,
+      },
+    };
+  }),
+
+  dismissOnboarding: protectedProcedure.mutation(({ ctx }) => {
+    return ctx.db.user.update({
+      where: { id: ctx.session.user.id },
+      data: { onboardingDismissed: true },
+    });
+  }),
+
+  enableOnboarding: protectedProcedure.mutation(({ ctx }) => {
+    return ctx.db.user.update({
+      where: { id: ctx.session.user.id },
+      data: { onboardingDismissed: false },
+    });
+  }),
+
   // List distinct sub-teams for filter dropdowns
   getSubTeams: protectedProcedure.query(async ({ ctx }) => {
     const result = await ctx.db.user.findMany({

@@ -1,10 +1,12 @@
 import { auth } from "~/server/auth";
+import { OnboardingBanner } from "./_components/OnboardingBanner";
 
 export default async function DashboardPage() {
   const session = await auth();
 
   return (
     <div>
+      <OnboardingBanner />
       <h1 className="text-2xl font-bold text-gray-900 mb-1">
         Welcome back, {session?.user.name?.split(" ")[0]}
       </h1>

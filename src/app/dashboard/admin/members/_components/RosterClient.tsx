@@ -55,6 +55,10 @@ export function RosterClient() {
     updateMember.mutate({ id, webId: value && parsed > 0 ? parsed : undefined });
   }
 
+  function handleExcludeChange(id: string, excluded: boolean) {
+    updateMember.mutate({ id, excludeFromExport: excluded });
+  }
+
   function closePanel() {
     setPanel(null);
     void utils.member.getRoster.invalidate();
@@ -134,7 +138,7 @@ export function RosterClient() {
         <p className="text-sm text-gray-400">No members found.</p>
       ) : (
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-x-auto">
-          <table className="w-full text-sm min-w-[860px]">
+          <table className="w-full text-sm min-w-[940px]">
             <thead>
               <tr className="border-b border-gray-200 bg-gray-50 text-left">
                 <th className="px-4 py-3 font-medium text-gray-600">Member</th>
@@ -145,6 +149,7 @@ export function RosterClient() {
                 <th className="px-4 py-3 font-medium text-gray-600">Attendance</th>
                 <th className="px-4 py-3 font-medium text-gray-600">Completions</th>
                 <th className="px-4 py-3 font-medium text-gray-600">Last Login</th>
+                <th className="px-4 py-3 font-medium text-gray-600">PR Export</th>
                 <th className="px-4 py-3 font-medium text-gray-600">Actions</th>
               </tr>
             </thead>
@@ -155,6 +160,7 @@ export function RosterClient() {
                   member={member}
                   onFieldChange={handleFieldChange}
                   onWebIdChange={handleWebIdChange}
+                  onExcludeChange={handleExcludeChange}
                   isSaving={updateMember.isPending}
                 />
               ))}
@@ -170,11 +176,13 @@ function MemberRow({
   member,
   onFieldChange,
   onWebIdChange,
+  onExcludeChange,
   isSaving,
 }: {
   member: RosterMember;
   onFieldChange: (id: string, field: "role" | "status" | "subTeam", value: string) => void;
   onWebIdChange: (id: string, value: string) => void;
+  onExcludeChange: (id: string, excluded: boolean) => void;
   isSaving: boolean;
 }) {
   const [subTeamInput, setSubTeamInput] = useState(member.subTeam ?? "");
@@ -305,6 +313,22 @@ function MemberRow({
               year: "numeric",
             })
           : "Never"}
+      </td>
+
+      {/* PR Export */}
+      <td className="px-4 py-3">
+        <label className="flex items-center gap-1.5 cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={!member.excludeFromExport}
+            onChange={(e) => onExcludeChange(member.id, !e.target.checked)}
+            disabled={isSaving}
+            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 disabled:opacity-50"
+          />
+          <span className={`text-xs ${member.excludeFromExport ? "text-gray-400" : "text-gray-700"}`}>
+            {member.excludeFromExport ? "Hidden" : "Included"}
+          </span>
+        </label>
       </td>
 
       {/* Actions */}

@@ -20,19 +20,14 @@ export function AttendanceClient({
 
   return (
     <div>
-      <h1 className="text-2xl font-bold text-gray-900 mb-6">Attendance</h1>
+      <h1 className="text-2xl font-bold text-gray-900 mb-6">Meetings</h1>
 
-      <div className="flex flex-wrap gap-x-6 border-b border-gray-200 mb-6">
+      <div className="flex overflow-x-auto border-b border-gray-200 mb-6 gap-x-6 scrollbar-none">
         <TabBtn active={tab === "meetings"} onClick={() => setTab("meetings")}>Meetings</TabBtn>
         <TabBtn active={tab === "mine"} onClick={() => setTab("mine")}>My Attendance</TabBtn>
-
         {isMember && (
-          <>
-            <span className="border-l border-gray-200 mx-1" />
-            <TabBtn active={tab === "manage"} onClick={() => setTab("manage")}>Manage Meetings</TabBtn>
-          </>
+          <TabBtn active={tab === "manage"} onClick={() => setTab("manage")}>Manage Meetings</TabBtn>
         )}
-
         {isAdmin && (
           <TabBtn active={tab === "report"} onClick={() => setTab("report")}>Report</TabBtn>
         )}

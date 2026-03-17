@@ -171,6 +171,7 @@ export const attendanceRouter = createTRPCRouter({
         description: z.string().optional(),
         startTime: z.date(),
         duration: z.number().int().positive().default(60),
+        notesAllowAttendees: z.boolean().optional(),
         projectId: z.string().optional(),
         teamsChannelId: z.string().optional(),
       }),
@@ -441,7 +442,16 @@ export const attendanceRouter = createTRPCRouter({
       where: { userId: ctx.session.user.id },
       include: {
         meeting: {
-          select: { id: true, title: true, startTime: true, duration: true },
+          select: {
+            id: true,
+            title: true,
+            startTime: true,
+            duration: true,
+            feedbacks: {
+              where: { userId: ctx.session.user.id },
+              select: { rating: true, comment: true, isAnonymous: true },
+            },
+          },
         },
       },
       orderBy: { checkInTime: "desc" },

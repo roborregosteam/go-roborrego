@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { api } from "~/trpc/react";
 import { useUpload } from "~/lib/useUpload";
 import { AvatarCropper } from "./AvatarCropper";
+import { OnboardingToggle } from "./OnboardingToggle";
 
 export default function EditProfilePage() {
   const router = useRouter();
@@ -248,6 +249,19 @@ export default function EditProfilePage() {
         connected={me?.microsoftConnected ?? false}
         onDisconnect={() => void utils.member.getMe.invalidate()}
       />
+      <div className="mt-6 bg-white rounded-xl border border-gray-200 shadow-sm">
+        <div className="px-6 py-5 border-b border-gray-100">
+          <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">
+            Onboarding
+          </p>
+          <p className="text-sm text-gray-500 mt-1">
+            Show or hide the onboarding checklist on your dashboard.
+          </p>
+        </div>
+        <div className="px-6 py-5">
+          <OnboardingToggle />
+        </div>
+      </div>
     </div>
   );
 }

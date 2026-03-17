@@ -11,6 +11,10 @@ Tracks what is still needed from the SRS (v1.0, March 14 2026). Items are groupe
 - **Member Profiles** — all profile fields, edit own profile, searchable/filterable member directory
 - **Roster Management (partial)** — admin can update role/status/profile fields via `updateMember`
 - **Work Plan** — semester management, activity CRUD, interest/completion flow, admin review, leaderboard, summary stats
+- **Mobile-friendly layout** — collapsible sidebar drawer on mobile, hamburger menu, responsive padding, horizontally-scrollable tabs and tables
+- **Onboarding** — per-user onboarding checklist (`/dashboard/onboarding`) with 5 auto-detected tasks, dismissable banner on dashboard, re-enable toggle in profile settings
+- **Meeting feedback UI** — inline feedback form (star rating, comment, anonymous toggle) in My Attendance tab per past meeting
+- **PR export toggle in roster** — admin can check/uncheck `excludeFromExport` per member directly in the roster table
 
 ---
 
@@ -90,7 +94,7 @@ Referenced in the data model (`Event`, RSVPs) but not fully specified in a secti
 - [ ] Full keyboard navigation (focus traps in modals, skip-to-content link)
 - [ ] Sufficient color contrast (especially blue-on-dark-blue in sidebar)
 - [ ] Screen reader support (`aria-label`, `aria-live` for dynamic updates)
-- [ ] Responsive layout audit on tablet and mobile viewports
+- [x] Responsive layout audit on tablet and mobile viewports
 
 ---
 

@@ -5,6 +5,7 @@ import { useState } from "react";
 import { api, type RouterOutputs } from "~/trpc/react";
 import { MeetingCalendar } from "./MeetingCalendar";
 import { MeetingDetailModal } from "./MeetingDetailModal";
+import { CreateMeetingModal } from "./CreateMeetingModal";
 
 type Meeting = RouterOutputs["attendance"]["getMeetings"][0];
 
@@ -12,35 +13,61 @@ export function MeetingsTab({ isMember }: { isMember: boolean }) {
   const { data: meetings, isPending } = api.attendance.getMeetings.useQuery();
   const [view, setView] = useState<"calendar" | "list">("calendar");
   const [selectedMeeting, setSelectedMeeting] = useState<Meeting | null>(null);
+  const [showCreate, setShowCreate] = useState(false);
 
   if (isPending) return <p className="text-sm text-gray-400">Loading...</p>;
   if (!meetings?.length)
-    return <p className="text-sm text-gray-400">No meetings yet.</p>;
+    return (
+      <div>
+        {isMember && (
+          <button
+            onClick={() => setShowCreate(true)}
+            className="mb-4 px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            + New Meeting
+          </button>
+        )}
+        <p className="text-sm text-gray-400">No meetings yet.</p>
+        {showCreate && <CreateMeetingModal onClose={() => setShowCreate(false)} />}
+      </div>
+    );
 
   return (
     <div>
-      {/* View toggle */}
-      <div className="flex gap-1 mb-5 bg-gray-100 rounded-lg p-1 w-fit">
-        <button
-          onClick={() => setView("calendar")}
-          className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
-            view === "calendar"
-              ? "bg-white text-gray-900 shadow-sm font-medium"
-              : "text-gray-500 hover:text-gray-700"
-          }`}
-        >
-          Calendar
-        </button>
-        <button
-          onClick={() => setView("list")}
-          className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
-            view === "list"
-              ? "bg-white text-gray-900 shadow-sm font-medium"
-              : "text-gray-500 hover:text-gray-700"
-          }`}
-        >
-          List
-        </button>
+      {/* Toolbar */}
+      <div className="flex items-center justify-between mb-5">
+        {/* View toggle */}
+        <div className="flex gap-1 bg-gray-100 rounded-lg p-1 w-fit">
+          <button
+            onClick={() => setView("calendar")}
+            className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
+              view === "calendar"
+                ? "bg-white text-gray-900 shadow-sm font-medium"
+                : "text-gray-500 hover:text-gray-700"
+            }`}
+          >
+            Calendar
+          </button>
+          <button
+            onClick={() => setView("list")}
+            className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
+              view === "list"
+                ? "bg-white text-gray-900 shadow-sm font-medium"
+                : "text-gray-500 hover:text-gray-700"
+            }`}
+          >
+            List
+          </button>
+        </div>
+
+        {isMember && (
+          <button
+            onClick={() => setShowCreate(true)}
+            className="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            + New Meeting
+          </button>
+        )}
       </div>
 
       {/* Calendar view */}
@@ -72,6 +99,11 @@ export function MeetingsTab({ isMember }: { isMember: boolean }) {
           isMember={isMember}
           onClose={() => setSelectedMeeting(null)}
         />
+      )}
+
+      {/* Create modal */}
+      {showCreate && (
+        <CreateMeetingModal onClose={() => setShowCreate(false)} />
       )}
     </div>
   );
