@@ -72,6 +72,7 @@ export const memberRouter = createTRPCRouter({
           githubUsername: true,
           linkedinUrl: true,
           graduationDate: true,
+          birthday: true,
           joinDate: true,
           subTeam: true,
           role: true,
@@ -123,6 +124,7 @@ export const memberRouter = createTRPCRouter({
         githubUsername: z.string().optional(),
         linkedinUrl: z.string().url().optional().or(z.literal("")),
         graduationDate: z.date().optional(),
+        birthday: z.date().optional(),
         subTeam: z.string().optional(),
       }),
     )
@@ -170,6 +172,7 @@ export const memberRouter = createTRPCRouter({
         githubUsername: z.string().optional(),
         linkedinUrl: z.string().url().optional().or(z.literal("")),
         graduationDate: z.date().optional(),
+        birthday: z.date().optional(),
         // Web export metadata
         webId: z.number().int().positive().optional(),
         lastname: z.string().optional(),

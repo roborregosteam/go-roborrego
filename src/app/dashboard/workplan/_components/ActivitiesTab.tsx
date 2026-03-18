@@ -13,9 +13,7 @@ export function ActivitiesTab({
   userId: string;
 }) {
   const utils = api.useUtils();
-  const { data: activities, isLoading } = api.workPlan.getActivities.useQuery({
-    semesterId,
-  });
+  const { data: activities, isLoading } = api.workPlan.getActivities.useQuery({ semesterId });
 
   const expressInterest = api.workPlan.expressInterest.useMutation({
     onSuccess: () => utils.workPlan.getActivities.invalidate(),
@@ -27,6 +25,14 @@ export function ActivitiesTab({
   const [submittingId, setSubmittingId] = useState<string | null>(null);
   const [note, setNote] = useState("");
   const [submitError, setSubmitError] = useState("");
+
+  // Filters
+  const [search, setSearch] = useState("");
+  const [onlyInterested, setOnlyInterested] = useState(false);
+
+  // Collapsible sections
+  const [mandatoryOpen, setMandatoryOpen] = useState(true);
+  const [optionalOpen, setOptionalOpen] = useState(true);
 
   const submitCompletion = api.workPlan.submitCompletion.useMutation({
     onSuccess: () => {
@@ -44,60 +50,75 @@ export function ActivitiesTab({
   if (!activities?.length)
     return <p className="text-sm text-gray-400">No activities for this semester yet.</p>;
 
-  // Group: mandatory first, then by estimated date
-  const mandatory = activities.filter((a) => a.isMandatory);
-  const optional = activities.filter((a) => !a.isMandatory);
+  const filtered = activities.filter((a) => {
+    if (search && !a.name.toLowerCase().includes(search.toLowerCase())) return false;
+    if (onlyInterested && !a.isInterested) return false;
+    return true;
+  });
+
+  const mandatory = filtered.filter((a) => a.isMandatory);
+  const optional = filtered.filter((a) => !a.isMandatory);
+
+  const sharedProps = {
+    submittingId,
+    note,
+    submitError,
+    onInterestToggle: (id: string, isInterested: boolean) =>
+      isInterested ? removeInterest.mutate({ activityId: id }) : expressInterest.mutate({ activityId: id }),
+    onOpenSubmit: (id: string) => { setSubmittingId(id); setNote(""); setSubmitError(""); },
+    onCancelSubmit: () => { setSubmittingId(null); setNote(""); setSubmitError(""); },
+    onNoteChange: setNote,
+    onSubmit: (activityId: string) => { if (!note.trim()) return; submitCompletion.mutate({ activityId, note }); },
+    isSubmitting: submitCompletion.isPending,
+  };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
+      {/* Filters */}
+      <div className="flex flex-col sm:flex-row gap-3">
+        <input
+          type="text"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search activities…"
+          className="flex-1 rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+        />
+        <button
+          onClick={() => setOnlyInterested((v) => !v)}
+          className={`shrink-0 rounded-lg border px-4 py-2 text-sm font-medium transition-colors ${
+            onlyInterested
+              ? "border-blue-300 bg-blue-50 text-blue-700"
+              : "border-gray-200 text-gray-600 hover:bg-gray-50"
+          }`}
+        >
+          {onlyInterested ? "Interested ✓" : "All activities"}
+        </button>
+      </div>
+
+      {filtered.length === 0 && (
+        <p className="text-sm text-gray-400">No activities match your filters.</p>
+      )}
+
       {mandatory.length > 0 && (
-        <Section title="Mandatory">
-          <ActivityList
-            activities={mandatory}
-            userId={userId}
-            submittingId={submittingId}
-            note={note}
-            submitError={submitError}
-            onInterestToggle={(id, isInterested) =>
-              isInterested
-                ? removeInterest.mutate({ activityId: id })
-                : expressInterest.mutate({ activityId: id })
-            }
-            onOpenSubmit={(id) => { setSubmittingId(id); setNote(""); setSubmitError(""); }}
-            onCancelSubmit={() => { setSubmittingId(null); setNote(""); setSubmitError(""); }}
-            onNoteChange={setNote}
-            onSubmit={(activityId) => {
-              if (!note.trim()) return;
-              submitCompletion.mutate({ activityId, note });
-            }}
-            isSubmitting={submitCompletion.isPending}
-          />
-        </Section>
+        <CollapsibleSection
+          title="Mandatory"
+          count={mandatory.length}
+          open={mandatoryOpen}
+          onToggle={() => setMandatoryOpen((v) => !v)}
+        >
+          <ActivityList activities={mandatory} userId={userId} {...sharedProps} />
+        </CollapsibleSection>
       )}
 
       {optional.length > 0 && (
-        <Section title={mandatory.length > 0 ? "Optional" : "All Activities"}>
-          <ActivityList
-            activities={optional}
-            userId={userId}
-            submittingId={submittingId}
-            note={note}
-            submitError={submitError}
-            onInterestToggle={(id, isInterested) =>
-              isInterested
-                ? removeInterest.mutate({ activityId: id })
-                : expressInterest.mutate({ activityId: id })
-            }
-            onOpenSubmit={(id) => { setSubmittingId(id); setNote(""); setSubmitError(""); }}
-            onCancelSubmit={() => { setSubmittingId(null); setNote(""); setSubmitError(""); }}
-            onNoteChange={setNote}
-            onSubmit={(activityId) => {
-              if (!note.trim()) return;
-              submitCompletion.mutate({ activityId, note });
-            }}
-            isSubmitting={submitCompletion.isPending}
-          />
-        </Section>
+        <CollapsibleSection
+          title={mandatory.length > 0 ? "Optional" : "All Activities"}
+          count={optional.length}
+          open={optionalOpen}
+          onToggle={() => setOptionalOpen((v) => !v)}
+        >
+          <ActivityList activities={optional} userId={userId} {...sharedProps} />
+        </CollapsibleSection>
       )}
     </div>
   );
@@ -118,6 +139,38 @@ type Activity = {
     adminNote: string | null;
   } | null;
 };
+
+function CollapsibleSection({
+  title,
+  count,
+  open,
+  onToggle,
+  children,
+}: {
+  title: string;
+  count: number;
+  open: boolean;
+  onToggle: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <div>
+      <button
+        onClick={onToggle}
+        className="flex w-full items-center gap-2 mb-3 group"
+      >
+        <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">
+          {title}
+        </span>
+        <span className="text-xs text-gray-300 font-medium">({count})</span>
+        <span className="ml-auto text-gray-400 group-hover:text-gray-600 transition-colors text-xs">
+          {open ? "▲" : "▼"}
+        </span>
+      </button>
+      {open && children}
+    </div>
+  );
+}
 
 function ActivityList({
   activities,
@@ -174,7 +227,6 @@ function ActivityList({
                   Est. {new Date(activity.estimatedDate).toLocaleDateString()}
                 </p>
               )}
-              {/* Show admin note on rejected submissions */}
               {activity.completion?.status === "REJECTED" && activity.completion.adminNote && (
                 <p className="mt-1.5 text-xs text-red-600 bg-red-50 border border-red-100 rounded px-2 py-1">
                   Feedback: {activity.completion.adminNote}
@@ -182,10 +234,8 @@ function ActivityList({
               )}
             </div>
 
-            {/* Action buttons — hide once approved */}
             {activity.completion?.status !== "APPROVED" && (
-              <div className="flex flex-col gap-2 flex-shrink-0">
-                {/* Interest toggle — only while no pending submission and not mandatory */}
+              <div className="flex flex-col gap-2 shrink-0">
                 {!activity.completion && !activity.isMandatory && (
                   <button
                     onClick={() => onInterestToggle(activity.id, activity.isInterested)}
@@ -198,7 +248,6 @@ function ActivityList({
                     {activity.isInterested ? "Interested ✓" : "Show Interest"}
                   </button>
                 )}
-                {/* Submit — show when no submission or when rejected (allow resubmission) */}
                 {(!activity.completion || activity.completion.status === "REJECTED") && (
                   <button
                     onClick={() => onOpenSubmit(activity.id)}
@@ -211,7 +260,6 @@ function ActivityList({
             )}
           </div>
 
-          {/* Inline submission form */}
           {submittingId === activity.id && (
             <div className="mt-4 pt-4 border-t border-gray-100">
               <label className="block text-xs font-medium text-gray-700 mb-1">
@@ -247,17 +295,6 @@ function ActivityList({
           )}
         </div>
       ))}
-    </div>
-  );
-}
-
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <div>
-      <h2 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">
-        {title}
-      </h2>
-      {children}
     </div>
   );
 }

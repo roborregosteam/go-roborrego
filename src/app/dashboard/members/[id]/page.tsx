@@ -93,6 +93,12 @@ export default async function MemberProfilePage({
                 value={member.graduationDate.toLocaleDateString()}
               />
             )}
+            {member.birthday && (
+              <InfoField
+                label="Birthday"
+                value={member.birthday.toLocaleDateString(undefined, { month: "long", day: "numeric" })}
+              />
+            )}
             {(isOwnProfile || isAdmin) && member.phone && (
               <InfoField label="Phone" value={member.phone} />
             )}

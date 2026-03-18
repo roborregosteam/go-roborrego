@@ -23,6 +23,9 @@ export function EditMemberForm({ member }: { member: Member }) {
     graduationDate: member.graduationDate
       ? new Date(member.graduationDate).toISOString().slice(0, 10)
       : "",
+    birthday: member.birthday
+      ? new Date(member.birthday).toISOString().slice(0, 10)
+      : "",
     // Web export
     webId: member.webId !== null ? String(member.webId) : "",
     lastname: member.lastname ?? "",
@@ -61,6 +64,7 @@ export function EditMemberForm({ member }: { member: Member }) {
       githubUsername: form.githubUsername || undefined,
       linkedinUrl: form.linkedinUrl || undefined,
       graduationDate: form.graduationDate ? new Date(form.graduationDate) : undefined,
+      birthday: form.birthday ? new Date(form.birthday) : undefined,
       webId: form.webId ? parseInt(form.webId, 10) : undefined,
       lastname: form.lastname || undefined,
       subtitle: form.subtitle || undefined,
@@ -182,6 +186,13 @@ export function EditMemberForm({ member }: { member: Member }) {
             label="Graduation Date"
             name="graduationDate"
             value={form.graduationDate}
+            onChange={handleChange}
+            type="date"
+          />
+          <Field
+            label="Birthday"
+            name="birthday"
+            value={form.birthday}
             onChange={handleChange}
             type="date"
           />

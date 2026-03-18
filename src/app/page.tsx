@@ -1,6 +1,8 @@
+import Image from "next/image";
 import { redirect } from "next/navigation";
 
 import { auth, signIn } from "~/server/auth";
+import { TypewriterText } from "./_components/TypewriterText";
 
 export default async function Home() {
   const session = await auth();
@@ -10,14 +12,39 @@ export default async function Home() {
   }
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center bg-linear-to-b from-[#1a2744] to-[#0f1729] text-white">
-      <div className="container flex flex-col items-center justify-center gap-12 px-4 py-16">
-        <div className="text-center">
-          <h1 className="text-5xl font-extrabold tracking-tight sm:text-[5rem]">
-            RoBorregos
-          </h1>
-          <p className="mt-4 text-xl text-blue-200">Team Management Platform</p>
-        </div>
+    <main className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-black text-white">
+      {/* Ram logo — large background watermark */}
+      <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+        <Image
+          src="/roborregos.png"
+          alt=""
+          width={640}
+          height={640}
+          className="object-contain opacity-[0.08]"
+          priority
+        />
+      </div>
+
+      {/* Dark overlay */}
+      <div className="absolute inset-0 bg-black/60" />
+
+      {/* Content */}
+      <div
+        className="relative flex flex-col items-center gap-6 px-6 text-center"
+        style={{ fontFamily: "var(--font-titillium), sans-serif" }}
+      >
+        <h1
+          className="text-5xl leading-tight sm:text-7xl"
+          style={{
+            fontFamily: "var(--font-press-start), monospace",
+            color: "#3d55ff",
+            textShadow: "0 0 40px rgba(61,85,255,0.5)",
+          }}
+        >
+          RoBorregos
+        </h1>
+
+        <TypewriterText />
 
         <form
           action={async () => {
@@ -27,7 +54,12 @@ export default async function Home() {
         >
           <button
             type="submit"
-            className="rounded-full bg-white px-10 py-3 font-semibold text-[#1a2744] transition hover:bg-blue-100"
+            className="mt-4 rounded px-10 py-3 text-sm font-bold uppercase tracking-widest transition-all duration-200 hover:scale-[1.04] hover:brightness-110"
+            style={{
+              background: "#3d55ff",
+              color: "#ffffff",
+              letterSpacing: "0.15em",
+            }}
           >
             Sign in with Google
           </button>

@@ -113,6 +113,7 @@ model User {
     githubUsername String?
     linkedinUrl    String?
     graduationDate DateTime?
+    birthday       DateTime?
     joinDate       DateTime     @default(now())
     subTeam        String?
     // RBAC
@@ -183,6 +184,7 @@ model ProfileEdit {
     linkedinUrl    String?
     subTeam        String?
     graduationDate DateTime?
+    birthday       DateTime?
 
     user     User  @relation(fields: [userId], references: [id], onDelete: Cascade)
     reviewer User? @relation("ProfileEditReviewer", fields: [reviewedBy], references: [id])

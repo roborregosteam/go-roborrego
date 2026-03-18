@@ -14,6 +14,7 @@ const PROFILE_FIELDS = [
   { key: "githubUsername", label: "GitHub" },
   { key: "linkedinUrl", label: "LinkedIn" },
   { key: "graduationDate", label: "Graduation Date" },
+  { key: "birthday", label: "Birthday" },
 ] as const;
 
 type FieldKey = (typeof PROFILE_FIELDS)[number]["key"];
@@ -80,7 +81,7 @@ function EditCard({
 
   function formatValue(key: FieldKey, value: unknown) {
     if (value === null || value === undefined) return <span className="text-gray-300 italic">unchanged</span>;
-    if (key === "graduationDate") return new Date(value as string).toLocaleDateString();
+    if (key === "graduationDate" || key === "birthday") return new Date(value as string).toLocaleDateString();
     return String(value as string);
   }
 

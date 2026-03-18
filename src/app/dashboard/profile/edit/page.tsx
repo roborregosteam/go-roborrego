@@ -24,6 +24,7 @@ export default function EditProfilePage() {
     linkedinUrl: "",
     subTeam: "",
     graduationDate: "",
+    birthday: "",
   });
 
   // Populate form once data loads
@@ -38,6 +39,9 @@ export default function EditProfilePage() {
         subTeam: me.subTeam ?? "",
         graduationDate: me.graduationDate
           ? me.graduationDate.toISOString().slice(0, 10)
+          : "",
+        birthday: me.birthday
+          ? me.birthday.toISOString().slice(0, 10)
           : "",
       });
     }
@@ -79,6 +83,7 @@ export default function EditProfilePage() {
       graduationDate: form.graduationDate
         ? new Date(form.graduationDate)
         : undefined,
+      birthday: form.birthday ? new Date(form.birthday) : undefined,
     });
   }
 
@@ -195,6 +200,13 @@ export default function EditProfilePage() {
             label="Graduation Date"
             name="graduationDate"
             value={form.graduationDate}
+            onChange={handleChange}
+            type="date"
+          />
+          <Field
+            label="Birthday"
+            name="birthday"
+            value={form.birthday}
             onChange={handleChange}
             type="date"
           />

@@ -107,6 +107,7 @@ export const adminRouter = createTRPCRouter({
             linkedinUrl: true,
             subTeam: true,
             graduationDate: true,
+            birthday: true,
           },
         },
       },
@@ -391,6 +392,7 @@ export const adminRouter = createTRPCRouter({
               ...(edit.graduationDate !== null && {
                 graduationDate: edit.graduationDate,
               }),
+              ...(edit.birthday !== null && { birthday: edit.birthday }),
             },
           });
         }
