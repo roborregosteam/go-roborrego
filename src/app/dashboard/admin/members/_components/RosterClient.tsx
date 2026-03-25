@@ -50,6 +50,16 @@ export function RosterClient() {
     updateMember.mutate({ id, [field]: value || undefined });
   }
 
+  function handleNameChange(id: string, value: string) {
+    if (!value.trim()) return;
+    updateMember.mutate({ id, name: value.trim() });
+  }
+
+  function handleEmailChange(id: string, value: string) {
+    if (!value.trim()) return;
+    updateMember.mutate({ id, email: value.trim() });
+  }
+
   function handleWebIdChange(id: string, value: string) {
     const parsed = parseInt(value, 10);
     updateMember.mutate({ id, webId: value && parsed > 0 ? parsed : undefined });
@@ -159,6 +169,8 @@ export function RosterClient() {
                   key={member.id}
                   member={member}
                   onFieldChange={handleFieldChange}
+                  onNameChange={handleNameChange}
+                  onEmailChange={handleEmailChange}
                   onWebIdChange={handleWebIdChange}
                   onExcludeChange={handleExcludeChange}
                   isSaving={updateMember.isPending}
@@ -175,17 +187,23 @@ export function RosterClient() {
 function MemberRow({
   member,
   onFieldChange,
+  onNameChange,
+  onEmailChange,
   onWebIdChange,
   onExcludeChange,
   isSaving,
 }: {
   member: RosterMember;
   onFieldChange: (id: string, field: "role" | "status" | "subTeam", value: string) => void;
+  onNameChange: (id: string, value: string) => void;
+  onEmailChange: (id: string, value: string) => void;
   onWebIdChange: (id: string, value: string) => void;
   onExcludeChange: (id: string, excluded: boolean) => void;
   isSaving: boolean;
 }) {
+  const [nameInput, setNameInput] = useState(member.name ?? "");
   const [subTeamInput, setSubTeamInput] = useState(member.subTeam ?? "");
+  const [emailInput, setEmailInput] = useState(member.email ?? "");
   const [webIdInput, setWebIdInput] = useState(member.webId !== null ? String(member.webId) : "");
 
   return (
@@ -208,8 +226,32 @@ function MemberRow({
             </div>
           )}
           <div className="min-w-0">
-            <p className="font-medium text-gray-900 truncate">{member.name}</p>
-            <p className="text-xs text-gray-400 truncate">{member.email}</p>
+            <input
+              type="text"
+              value={nameInput}
+              onChange={(e) => setNameInput(e.target.value)}
+              onBlur={() => {
+                if (nameInput.trim() && nameInput !== member.name) {
+                  onNameChange(member.id, nameInput.trim());
+                } else {
+                  setNameInput(member.name ?? "");
+                }
+              }}
+              className="w-full rounded border border-transparent hover:border-gray-300 focus:border-blue-400 px-1 py-0 text-sm font-medium text-gray-900 focus:outline-none bg-transparent focus:bg-white truncate"
+            />
+            <input
+              type="email"
+              value={emailInput}
+              onChange={(e) => setEmailInput(e.target.value)}
+              onBlur={() => {
+                if (emailInput !== member.email && emailInput.includes("@")) {
+                  onEmailChange(member.id, emailInput);
+                } else {
+                  setEmailInput(member.email ?? "");
+                }
+              }}
+              className="w-full rounded border border-transparent hover:border-gray-300 focus:border-blue-400 px-1 py-0 text-xs text-gray-400 focus:text-gray-700 focus:outline-none bg-transparent focus:bg-white truncate"
+            />
           </div>
         </div>
       </td>
