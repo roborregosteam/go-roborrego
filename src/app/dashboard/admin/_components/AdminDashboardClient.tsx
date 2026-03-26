@@ -179,6 +179,9 @@ export function AdminDashboardClient() {
 
         {/* Web export */}
         <WebExportPanel />
+
+        {/* Sayings moderation */}
+        <SayingsPanel />
       </div>
     </div>
   );
@@ -396,6 +399,157 @@ function PendingCompletionRow({
           Reject
         </button>
       </div>
+    </div>
+  );
+}
+
+function SayingsPanel() {
+  const utils = api.useUtils();
+  const { data: sayings = [], isLoading } = api.saying.listAll.useQuery();
+
+  const review = api.saying.review.useMutation({ onSuccess: () => void utils.saying.listAll.invalidate() });
+  const setVisible = api.saying.setVisible.useMutation({ onSuccess: () => void utils.saying.listAll.invalidate() });
+  const update = api.saying.update.useMutation({ onSuccess: () => { void utils.saying.listAll.invalidate(); setEditingId(null); } });
+
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editText, setEditText] = useState("");
+  const [editExplanation, setEditExplanation] = useState("");
+  const [editDate, setEditDate] = useState("");
+  const [editIsSerious, setEditIsSerious] = useState(false);
+
+  function startEdit(s: typeof sayings[0]) {
+    setEditingId(s.id);
+    setEditText(s.text);
+    setEditExplanation(s.explanation ?? "");
+    setEditDate(String(new Date(s.date).getFullYear()));
+    setEditIsSerious(s.isSerious);
+  }
+
+  const pending = sayings.filter((s) => s.status === "PENDING");
+  const rest = sayings.filter((s) => s.status !== "PENDING");
+
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden lg:col-span-2">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+        <div className="flex items-center gap-2">
+          <h2 className="text-sm font-semibold text-gray-900">Sayings</h2>
+          {pending.length > 0 && (
+            <span className="text-xs bg-amber-100 text-amber-700 font-medium px-1.5 py-0.5 rounded-full">
+              {pending.length} pending
+            </span>
+          )}
+        </div>
+      </div>
+
+      {isLoading ? (
+        <p className="px-4 py-4 text-sm text-gray-400">Loading…</p>
+      ) : sayings.length === 0 ? (
+        <p className="px-4 py-6 text-sm text-gray-400 text-center">No sayings submitted yet.</p>
+      ) : (
+        <div className="divide-y divide-gray-100">
+          {[...pending, ...rest].map((s) => (
+            <div key={s.id} className="px-4 py-3 space-y-2">
+              {editingId === s.id ? (
+                <div className="space-y-2">
+                  <textarea
+                    value={editText}
+                    onChange={(e) => setEditText(e.target.value)}
+                    rows={2}
+                    className="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                  />
+                  <textarea
+                    value={editExplanation}
+                    onChange={(e) => setEditExplanation(e.target.value)}
+                    rows={2}
+                    placeholder="Explanation (optional)"
+                    className="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                  />
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="number"
+                      min={2015}
+                      max={new Date().getFullYear()}
+                      value={editDate}
+                      onChange={(e) => setEditDate(e.target.value)}
+                      className="w-24 rounded-lg border border-gray-300 px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setEditIsSerious((v) => !v)}
+                      className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${editIsSerious ? "border-indigo-300 bg-indigo-50 text-indigo-700" : "border-yellow-300 bg-yellow-50 text-yellow-700"}`}
+                    >
+                      {editIsSerious ? "🧠 Serious" : "🎮 Fun"}
+                    </button>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => update.mutate({ id: s.id, text: editText.trim(), explanation: editExplanation.trim() || null, date: editDate ? new Date(`${editDate}-01-01`) : undefined, isSerious: editIsSerious })}
+                      disabled={update.isPending || !editText.trim()}
+                      className="text-xs px-3 py-1.5 rounded-lg bg-[#1a2744] text-white hover:bg-[#243660] disabled:opacity-50 transition-colors"
+                    >
+                      Save
+                    </button>
+                    <button
+                      onClick={() => setEditingId(null)}
+                      className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-start gap-3">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm text-gray-900">&ldquo;{s.text}&rdquo;</p>
+                    {s.explanation && <p className="text-xs text-gray-500 mt-0.5">{s.explanation}</p>}
+                    <p className="text-xs text-gray-400 mt-0.5">
+                      {new Date(s.date).getFullYear()}
+                      {" · by "}
+                      {s.submitter.name}
+                      {s.status !== "PENDING" && ` · ${s.status === "APPROVED" ? (s.isVisible ? "visible" : "hidden") : "rejected"}`}
+                    </p>
+                  </div>
+                  <div className="flex gap-1 shrink-0 flex-wrap justify-end">
+                    {s.status === "PENDING" && (
+                      <>
+                        <button
+                          onClick={() => review.mutate({ id: s.id, status: "APPROVED" })}
+                          disabled={review.isPending}
+                          className="text-xs px-2 py-1 bg-green-50 text-green-700 border border-green-200 rounded hover:bg-green-100 disabled:opacity-50 transition-colors"
+                        >
+                          Approve
+                        </button>
+                        <button
+                          onClick={() => review.mutate({ id: s.id, status: "REJECTED" })}
+                          disabled={review.isPending}
+                          className="text-xs px-2 py-1 bg-red-50 text-red-600 border border-red-200 rounded hover:bg-red-100 disabled:opacity-50 transition-colors"
+                        >
+                          Reject
+                        </button>
+                      </>
+                    )}
+                    {s.status === "APPROVED" && (
+                      <button
+                        onClick={() => setVisible.mutate({ id: s.id, isVisible: !s.isVisible })}
+                        disabled={setVisible.isPending}
+                        className="text-xs px-2 py-1 border border-gray-200 text-gray-600 rounded hover:bg-gray-50 disabled:opacity-50 transition-colors"
+                      >
+                        {s.isVisible ? "Hide" : "Show"}
+                      </button>
+                    )}
+                    <button
+                      onClick={() => startEdit(s)}
+                      className="text-xs px-2 py-1 border border-gray-200 text-gray-600 rounded hover:bg-gray-50 transition-colors"
+                    >
+                      Edit
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

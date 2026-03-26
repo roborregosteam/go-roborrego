@@ -157,6 +157,8 @@ model User {
     apiKey           ApiKey?
     profileEdits     ProfileEdit[]
     reviewedEdits    ProfileEdit[] @relation("ProfileEditReviewer")
+    sayingsSubmitted Saying[]      @relation("SayingSubmitter")
+    sayingsReviewed  Saying[]      @relation("SayingReviewer")
 }
 
 // ─── Profile Edits ────────────────────────────────────────────────────────────
@@ -411,6 +413,33 @@ model TaskComment {
     user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
     @@index([taskId])
+}
+
+// ─── Sayings ──────────────────────────────────────────────────────────────────
+
+enum SayingStatus {
+    PENDING
+    APPROVED
+    REJECTED
+}
+
+model Saying {
+    id          String       @id @default(cuid())
+    text        String
+    explanation String?
+    date        DateTime     @default(now())
+    status      SayingStatus @default(PENDING)
+    isSerious   Boolean      @default(false)
+    isVisible   Boolean      @default(true)
+    submittedBy String
+    submittedAt DateTime     @default(now())
+    reviewedAt  DateTime?
+    reviewedBy  String?
+
+    submitter User  @relation("SayingSubmitter", fields: [submittedBy], references: [id])
+    reviewer  User? @relation("SayingReviewer", fields: [reviewedBy], references: [id])
+
+    @@index([status, isVisible])
 }
 
 model TaskAttachment {

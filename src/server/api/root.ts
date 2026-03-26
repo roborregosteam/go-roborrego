@@ -3,6 +3,7 @@ import { apiKeyRouter } from "~/server/api/routers/apiKey";
 import { attendanceRouter } from "~/server/api/routers/attendance";
 import { memberRouter } from "~/server/api/routers/member";
 import { projectRouter } from "~/server/api/routers/project";
+import { sayingRouter } from "~/server/api/routers/saying";
 import { workPlanRouter } from "~/server/api/routers/workPlan";
 import { createCallerFactory, createTRPCRouter } from "~/server/api/trpc";
 
@@ -18,6 +19,7 @@ export const appRouter = createTRPCRouter({
   workPlan: workPlanRouter,
   attendance: attendanceRouter,
   project: projectRouter,
+  saying: sayingRouter,
 });
 
 // export type definition of API
