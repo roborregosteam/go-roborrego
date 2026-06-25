@@ -287,27 +287,36 @@ export const workPlanRouter = createTRPCRouter({
   getLeaderboard: protectedProcedure
     .input(z.object({ semesterId: z.string() }))
     .query(async ({ ctx, input }) => {
-      // Get approved completions grouped by user for this semester
-      const completions = await ctx.db.workPlanCompletion.findMany({
-        where: {
-          status: "APPROVED",
-          activity: { semesterId: input.semesterId },
-        },
-        include: {
-          user: {
-            select: {
-              id: true,
-              name: true,
-              image: true,
-              status: true,
-              role: true,
-            },
+      const [completions, faults] = await Promise.all([
+        ctx.db.workPlanCompletion.findMany({
+          where: {
+            status: "APPROVED",
+            activity: { semesterId: input.semesterId },
           },
-          activity: { select: { points: true } },
-        },
-      });
+          include: {
+            user: {
+              select: {
+                id: true,
+                name: true,
+                image: true,
+                status: true,
+                role: true,
+              },
+            },
+            activity: { select: { points: true } },
+          },
+        }),
+        ctx.db.workPlanFault.findMany({
+          where: { semesterId: input.semesterId },
+          select: { userId: true, points: true },
+        }),
+      ]);
 
-      // Aggregate points per user (only active, non-admin members)
+      const faultMap = new Map<string, number>();
+      for (const f of faults) {
+        faultMap.set(f.userId, (faultMap.get(f.userId) ?? 0) + f.points);
+      }
+
       const pointsMap = new Map<
         string,
         { user: (typeof completions)[0]["user"]; points: number }
@@ -323,6 +332,12 @@ export const workPlanRouter = createTRPCRouter({
             points: c.activity.points,
           });
         }
+      }
+
+      // Subtract fault points
+      for (const [userId, penalty] of faultMap) {
+        const entry = pointsMap.get(userId);
+        if (entry) entry.points -= penalty;
       }
 
       return Array.from(pointsMap.values())
@@ -430,7 +445,7 @@ export const workPlanRouter = createTRPCRouter({
   getMemberSummary: memberProcedure
     .input(z.object({ semesterId: z.string(), userId: z.string() }))
     .query(async ({ ctx, input }) => {
-      const [interests, completions, allActivities] = await Promise.all([
+      const [interests, completions, allActivities, faults] = await Promise.all([
         ctx.db.workPlanInterest.findMany({
           where: {
             userId: input.userId,
@@ -448,10 +463,15 @@ export const workPlanRouter = createTRPCRouter({
         ctx.db.workPlanActivity.findMany({
           where: { semesterId: input.semesterId },
         }),
+        ctx.db.workPlanFault.findMany({
+          where: { userId: input.userId, semesterId: input.semesterId },
+          select: { points: true },
+        }),
       ]);
       const approvedPoints = completions
         .filter((c) => c.status === "APPROVED")
         .reduce((sum, c) => sum + c.activity.points, 0);
+      const faultPoints = faults.reduce((sum, f) => sum + f.points, 0);
       const tentativePoints = interests.reduce(
         (sum, i) => sum + i.activity.points,
         0,
@@ -468,6 +488,8 @@ export const workPlanRouter = createTRPCRouter({
       );
       return {
         approvedPoints,
+        faultPoints,
+        netPoints: approvedPoints - faultPoints,
         tentativePoints,
         interestedCount: interests.length,
         mandatoryTotal: mandatoryActivities.length,
@@ -478,9 +500,9 @@ export const workPlanRouter = createTRPCRouter({
   getAdminMemberStats: adminProcedure
     .input(z.object({ semesterId: z.string() }))
     .query(async ({ ctx, input }) => {
-      const [members, completions, interests, mandatoryActivities] = await Promise.all([
+      const [members, completions, interests, mandatoryActivities, faults] = await Promise.all([
         ctx.db.user.findMany({
-          select: { id: true, name: true, image: true, status: true, role: true },
+          select: { id: true, name: true, image: true, status: true, role: true, condicionado: true },
           orderBy: { name: "asc" },
         }),
         ctx.db.workPlanCompletion.findMany({
@@ -498,18 +520,26 @@ export const workPlanRouter = createTRPCRouter({
           where: { semesterId: input.semesterId, isMandatory: true },
           select: { id: true },
         }),
+        ctx.db.workPlanFault.findMany({
+          where: { semesterId: input.semesterId },
+          select: { userId: true, points: true },
+        }),
       ]);
 
       const mandatoryIds = new Set(mandatoryActivities.map((a) => a.id));
       const mandatoryTotal = mandatoryIds.size;
 
-      const totalMap = new Map<string, number>();
+      const earnedMap = new Map<string, number>();
       const mandatoryCompletedMap = new Map<string, number>();
       for (const c of completions) {
-        totalMap.set(c.userId, (totalMap.get(c.userId) ?? 0) + c.activity.points);
+        earnedMap.set(c.userId, (earnedMap.get(c.userId) ?? 0) + c.activity.points);
         if (mandatoryIds.has(c.activityId)) {
           mandatoryCompletedMap.set(c.userId, (mandatoryCompletedMap.get(c.userId) ?? 0) + 1);
         }
+      }
+      const faultMap = new Map<string, number>();
+      for (const f of faults) {
+        faultMap.set(f.userId, (faultMap.get(f.userId) ?? 0) + f.points);
       }
       const tentativeMap = new Map<string, number>();
       for (const i of interests) {
@@ -520,11 +550,14 @@ export const workPlanRouter = createTRPCRouter({
       }
 
       return members.map((m) => {
-        const totalPoints = totalMap.get(m.id) ?? 0;
+        const earnedPoints = earnedMap.get(m.id) ?? 0;
+        const faultPoints = faultMap.get(m.id) ?? 0;
+        const totalPoints = earnedPoints - faultPoints;
         const tentativePoints = tentativeMap.get(m.id) ?? 0;
         return {
           user: m,
           totalPoints,
+          faultPoints,
           tentativePoints,
           difference: totalPoints - tentativePoints,
           mandatoryCompleted: mandatoryCompletedMap.get(m.id) ?? 0,
@@ -538,7 +571,7 @@ export const workPlanRouter = createTRPCRouter({
     .query(async ({ ctx, input }) => {
       const userId = ctx.session.user.id;
 
-      const [interests, completions, allActivities] = await Promise.all([
+      const [interests, completions, allActivities, warnings, faults, user] = await Promise.all([
         ctx.db.workPlanInterest.findMany({
           where: { userId, activity: { semesterId: input.semesterId } },
           include: { activity: true },
@@ -550,11 +583,27 @@ export const workPlanRouter = createTRPCRouter({
         ctx.db.workPlanActivity.findMany({
           where: { semesterId: input.semesterId },
         }),
+        ctx.db.workPlanWarning.findMany({
+          where: { userId, semesterId: input.semesterId },
+          select: { id: true, name: true, description: true, createdAt: true },
+          orderBy: { createdAt: "desc" },
+        }),
+        ctx.db.workPlanFault.findMany({
+          where: { userId, semesterId: input.semesterId },
+          select: { id: true, name: true, description: true, points: true, createdAt: true },
+          orderBy: { createdAt: "desc" },
+        }),
+        ctx.db.user.findUnique({
+          where: { id: userId },
+          select: { condicionado: true, condicionadoReason: true },
+        }),
       ]);
 
       const approvedPoints = completions
         .filter((c) => c.status === "APPROVED")
         .reduce((sum, c) => sum + c.activity.points, 0);
+
+      const faultPoints = faults.reduce((sum, f) => sum + f.points, 0);
 
       const tentativePoints = interests.reduce(
         (sum, i) => sum + i.activity.points,
@@ -574,11 +623,134 @@ export const workPlanRouter = createTRPCRouter({
 
       return {
         approvedPoints,
+        faultPoints,
+        netPoints: approvedPoints - faultPoints,
         tentativePoints,
         interestedCount: interests.length,
         completions,
         mandatoryTotal: mandatoryActivities.length,
         mandatoryCompleted: completedMandatoryIds.size,
+        warnings,
+        faults,
+        condicionado: user?.condicionado ?? false,
+        condicionadoReason: user?.condicionadoReason ?? null,
       };
+    }),
+
+  // ─── Warnings & Faults ──────────────────────────────────────────────────────
+
+  getActivityMemberCompletions: adminProcedure
+    .input(z.object({ activityId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const [members, completions] = await Promise.all([
+        ctx.db.user.findMany({
+          where: { status: "ACTIVE" },
+          select: { id: true, name: true, email: true, image: true },
+          orderBy: { name: "asc" },
+        }),
+        ctx.db.workPlanCompletion.findMany({
+          where: { activityId: input.activityId },
+          select: { userId: true, status: true, id: true },
+        }),
+      ]);
+
+      const completionMap = new Map(completions.map((c) => [c.userId, c]));
+      return members.map((m) => ({
+        user: m,
+        completion: completionMap.get(m.id) ?? null,
+      }));
+    }),
+
+  getWarningsAndFaults: protectedProcedure
+    .input(z.object({ userId: z.string(), semesterId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const isAdmin = ctx.session.user.role === "ADMIN";
+      const isSelf = ctx.session.user.id === input.userId;
+      if (!isAdmin && !isSelf) throw new TRPCError({ code: "FORBIDDEN" });
+
+      const [warnings, faults, user] = await Promise.all([
+        ctx.db.workPlanWarning.findMany({
+          where: { userId: input.userId, semesterId: input.semesterId },
+          include: { creator: { select: { name: true } } },
+          orderBy: { createdAt: "desc" },
+        }),
+        ctx.db.workPlanFault.findMany({
+          where: { userId: input.userId, semesterId: input.semesterId },
+          include: { creator: { select: { name: true } } },
+          orderBy: { createdAt: "desc" },
+        }),
+        ctx.db.user.findUnique({
+          where: { id: input.userId },
+          select: { condicionado: true, condicionadoReason: true },
+        }),
+      ]);
+
+      return {
+        warnings,
+        faults,
+        condicionado: user?.condicionado ?? false,
+        condicionadoReason: user?.condicionadoReason ?? null,
+      };
+    }),
+
+  addWarning: adminProcedure
+    .input(
+      z.object({
+        userId: z.string(),
+        semesterId: z.string(),
+        name: z.string().min(1),
+        description: z.string().optional(),
+      }),
+    )
+    .mutation(({ ctx, input }) => {
+      return ctx.db.workPlanWarning.create({
+        data: { ...input, createdBy: ctx.session.user.id },
+      });
+    }),
+
+  removeWarning: adminProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(({ ctx, input }) => {
+      return ctx.db.workPlanWarning.delete({ where: { id: input.id } });
+    }),
+
+  addFault: adminProcedure
+    .input(
+      z.object({
+        userId: z.string(),
+        semesterId: z.string(),
+        name: z.string().min(1),
+        description: z.string().optional(),
+        points: z.number().int().min(1),
+      }),
+    )
+    .mutation(({ ctx, input }) => {
+      return ctx.db.workPlanFault.create({
+        data: { ...input, createdBy: ctx.session.user.id },
+      });
+    }),
+
+  removeFault: adminProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(({ ctx, input }) => {
+      return ctx.db.workPlanFault.delete({ where: { id: input.id } });
+    }),
+
+  setCondicionado: adminProcedure
+    .input(
+      z.object({
+        userId: z.string(),
+        condicionado: z.boolean(),
+        reason: z.string().optional(),
+      }),
+    )
+    .mutation(({ ctx, input }) => {
+      return ctx.db.user.update({
+        where: { id: input.userId },
+        data: {
+          condicionado: input.condicionado,
+          condicionadoReason: input.condicionado ? (input.reason ?? null) : null,
+        },
+      });
     }),
 });

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import Link from "next/link";
 
 import { api, type RouterOutputs } from "~/trpc/react";
@@ -25,6 +25,48 @@ const ROLE_STYLES: Record<string, string> = {
 
 type Panel = "register" | "import" | null;
 
+const COLUMNS = ["Member","Sub-team","Class","Web ID","Role","Status","Attendance","Completions","Last Login","PR Export","Actions"] as const;
+const DEFAULT_COL_WIDTHS = [200, 110, 72, 80, 90, 90, 96, 100, 110, 96, 110];
+
+function useColumnResize(defaults: number[]) {
+  const [widths, setWidths] = useState<number[]>(defaults);
+
+  const startResize = useCallback((colIndex: number, e: React.MouseEvent) => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startWidth = widths[colIndex] ?? defaults[colIndex] ?? 100;
+
+    function onMouseMove(ev: MouseEvent) {
+      setWidths((prev) => {
+        const next = [...prev];
+        next[colIndex] = Math.max(48, startWidth + ev.clientX - startX);
+        return next;
+      });
+    }
+
+    function onMouseUp() {
+      window.removeEventListener("mousemove", onMouseMove);
+      window.removeEventListener("mouseup", onMouseUp);
+    }
+
+    window.addEventListener("mousemove", onMouseMove);
+    window.addEventListener("mouseup", onMouseUp);
+  }, [widths, defaults]);
+
+  return { widths, setWidths, startResize };
+}
+
+function ResizeHandle({ onMouseDown }: { onMouseDown: (e: React.MouseEvent) => void }) {
+  return (
+    <div
+      onMouseDown={onMouseDown}
+      className="absolute top-0 right-0 h-full w-1.5 cursor-col-resize group flex items-center justify-center select-none"
+    >
+      <div className="w-px h-4 bg-gray-300 group-hover:bg-blue-400 group-active:bg-blue-500 transition-colors" />
+    </div>
+  );
+}
+
 export function RosterClient() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<
@@ -32,6 +74,75 @@ export function RosterClient() {
   >(() => (sessionStorage.getItem("roster_status") as "ACTIVE" | "INACTIVE" | "ALUMNI") || "ACTIVE");
   const [panel, setPanel] = useState<Panel>(null);
   const [sortByWebId, setSortByWebId] = useState(true);
+  const [condicionadoOnly, setCondicionadoOnly] = useState(false);
+  const [hiddenCols, setHiddenCols] = useState<Set<number>>(() => {
+    if (typeof window === "undefined") return new Set([1, 6, 7]);
+    const saved = localStorage.getItem("roster_hidden_cols");
+    if (!saved) return new Set([1, 6, 7]);
+    try {
+      return new Set(JSON.parse(saved) as number[]);
+    } catch {
+      return new Set([1, 6, 7]);
+    }
+  });
+  const { widths, setWidths, startResize } = useColumnResize(DEFAULT_COL_WIDTHS);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    localStorage.setItem("roster_hidden_cols", JSON.stringify([...hiddenCols]));
+  }, [hiddenCols]);
+
+  // Scale visible column widths to always fill the container.
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const observer = new ResizeObserver(([entry]) => {
+      const cw = entry!.contentRect.width;
+      if (cw === 0) return;
+      setWidths((prev) => {
+        const visSum = prev.reduce((s, w, j) => s + (!hiddenCols.has(j) ? w : 0), 0);
+        if (visSum === 0) return prev;
+        return prev.map((w, j) => hiddenCols.has(j) ? w : Math.round(w * cw / visSum));
+      });
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [hiddenCols, setWidths]);
+
+  function normalizeToContainer(ws: number[], hidden: Set<number>): number[] {
+    const cw = containerRef.current?.clientWidth ?? 0;
+    if (cw === 0) return ws;
+    const visSum = ws.reduce((s, w, j) => s + (!hidden.has(j) ? w : 0), 0);
+    if (visSum === 0) return ws;
+    return ws.map((w, j) => hidden.has(j) ? w : Math.round(w * cw / visSum));
+  }
+
+  function hideCol(i: number) {
+    setWidths((prev) => {
+      const freed = prev[i] ?? 0;
+      const otherSum = prev.reduce((s, w, j) => s + (j !== i && !hiddenCols.has(j) ? w : 0), 0);
+      if (otherSum === 0) return prev;
+      const next = prev.map((w, j) => j !== i && !hiddenCols.has(j) ? Math.round(w + freed * (w / otherSum)) : w);
+      const nextHidden = new Set([...hiddenCols, i]);
+      return normalizeToContainer(next, nextHidden);
+    });
+    setHiddenCols((prev) => new Set([...prev, i]));
+  }
+  function showCol(i: number) {
+    const target = DEFAULT_COL_WIDTHS[i] ?? 100;
+    setWidths((prev) => {
+      const visSum = prev.reduce((s, w, j) => s + (!hiddenCols.has(j) ? w : 0), 0);
+      const next = prev.map((w, j) => {
+        if (j === i) return target;
+        if (hiddenCols.has(j)) return w;
+        return Math.max(40, Math.round(w - target * (w / (visSum || 1))));
+      });
+      const nextHidden = new Set(hiddenCols);
+      nextHidden.delete(i);
+      return normalizeToContainer(next, nextHidden);
+    });
+    setHiddenCols((prev) => { const next = new Set(prev); next.delete(i); return next; });
+  }
 
   const { data: members, isPending } = api.member.getRoster.useQuery({
     search: search || undefined,
@@ -80,9 +191,10 @@ export function RosterClient() {
     void utils.member.getRoster.invalidate();
   }
 
-  const sortedMembers = sortByWebId && members
+  const sortedMembers = (sortByWebId && members
     ? [...members].sort((a, b) => (a.webId ?? Infinity) - (b.webId ?? Infinity))
-    : (members ?? []);
+    : (members ?? [])
+  ).filter((m) => !condicionadoOnly || m.condicionado);
 
   return (
     <div>
@@ -150,7 +262,33 @@ export function RosterClient() {
             </option>
           ))}
         </select>
+        <button
+          onClick={() => setCondicionadoOnly((v) => !v)}
+          className={`px-3 py-2 rounded-lg text-sm border transition-colors ${
+            condicionadoOnly
+              ? "bg-orange-100 text-orange-700 border-orange-300"
+              : "bg-white text-gray-600 border-gray-300 hover:border-orange-300 hover:text-orange-600"
+          }`}
+        >
+          ⚠ Condicionados
+        </button>
       </div>
+
+      {/* Hidden column chips */}
+      {hiddenCols.size > 0 && (
+        <div className="flex flex-wrap gap-1.5 mb-3">
+          {Array.from(hiddenCols).sort().map((i) => (
+            <button
+              key={i}
+              onClick={() => showCol(i)}
+              className="flex items-center gap-1 px-2.5 py-1 text-xs rounded-full border border-gray-300 bg-white text-gray-600 hover:border-blue-400 hover:text-blue-600 transition-colors"
+            >
+              <span>{COLUMNS[i]}</span>
+              <span className="text-gray-400">+</span>
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Table */}
       {isPending ? (
@@ -158,28 +296,37 @@ export function RosterClient() {
       ) : !members?.length ? (
         <p className="text-sm text-gray-400">No members found.</p>
       ) : (
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-x-auto">
-          <table className="w-full text-sm min-w-255">
+        <div ref={containerRef} className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-x-auto">
+          <table className="text-sm table-fixed w-full [&_td]:overflow-hidden [&_td]:whitespace-nowrap">
+            <colgroup>
+              {widths.map((w, i) => hiddenCols.has(i) ? null : (
+                <col key={i} style={{ width: w }} />
+              ))}
+            </colgroup>
             <thead>
               <tr className="border-b border-gray-200 bg-gray-50 text-left">
-                <th className="px-4 py-3 font-medium text-gray-600">Member</th>
-                <th className="px-4 py-3 font-medium text-gray-600">Sub-team</th>
-                <th className="px-4 py-3 font-medium text-gray-600">Class</th>
-                <th className="px-4 py-3 font-medium text-gray-600">
-                  <button
-                    onClick={() => setSortByWebId((v) => !v)}
-                    className={`flex items-center gap-1 hover:text-gray-900 transition-colors ${sortByWebId ? "text-blue-600" : ""}`}
-                  >
-                    Web ID {sortByWebId ? "↑" : "↕"}
-                  </button>
-                </th>
-                <th className="px-4 py-3 font-medium text-gray-600">Role</th>
-                <th className="px-4 py-3 font-medium text-gray-600">Status</th>
-                <th className="px-4 py-3 font-medium text-gray-600">Attendance</th>
-                <th className="px-4 py-3 font-medium text-gray-600">Completions</th>
-                <th className="px-4 py-3 font-medium text-gray-600">Last Login</th>
-                <th className="px-4 py-3 font-medium text-gray-600">PR Export</th>
-                <th className="px-4 py-3 font-medium text-gray-600">Actions</th>
+                {COLUMNS.map((label, i) => hiddenCols.has(i) ? null : (
+                  <th key={label} className="px-4 py-3 font-medium text-gray-600 relative overflow-hidden group/th">
+                    <div className="flex items-center gap-1 pr-4">
+                      {label === "Web ID" ? (
+                        <button
+                          onClick={() => setSortByWebId((v) => !v)}
+                          className={`flex items-center gap-1 hover:text-gray-900 transition-colors ${sortByWebId ? "text-blue-600" : ""}`}
+                        >
+                          Web ID {sortByWebId ? "↑" : "↕"}
+                        </button>
+                      ) : label}
+                      <button
+                        onClick={() => hideCol(i)}
+                        title="Hide column"
+                        className="opacity-0 group-hover/th:opacity-100 ml-auto text-gray-400 hover:text-gray-600 transition-opacity leading-none text-xs shrink-0"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                    <ResizeHandle onMouseDown={(e) => startResize(i, e)} />
+                  </th>
+                ))}
               </tr>
             </thead>
             <tbody>
@@ -187,6 +334,7 @@ export function RosterClient() {
                 <MemberRow
                   key={member.id}
                   member={member}
+                  hiddenCols={hiddenCols}
                   onFieldChange={handleFieldChange}
                   onNameChange={handleNameChange}
                   onEmailChange={handleEmailChange}
@@ -206,6 +354,7 @@ export function RosterClient() {
 
 function MemberRow({
   member,
+  hiddenCols,
   onFieldChange,
   onNameChange,
   onEmailChange,
@@ -215,6 +364,7 @@ function MemberRow({
   isSaving,
 }: {
   member: RosterMember;
+  hiddenCols: Set<number>;
   onFieldChange: (id: string, field: "role" | "status" | "subTeam", value: string) => void;
   onNameChange: (id: string, value: string) => void;
   onEmailChange: (id: string, value: string) => void;
@@ -223,6 +373,7 @@ function MemberRow({
   onExcludeChange: (id: string, excluded: boolean) => void;
   isSaving: boolean;
 }) {
+  const col = (i: number) => !hiddenCols.has(i);
   const [nameInput, setNameInput] = useState(member.name ?? "");
   const [subTeamInput, setSubTeamInput] = useState(member.subTeam ?? "");
   const [emailInput, setEmailInput] = useState(member.email ?? "");
@@ -231,9 +382,9 @@ function MemberRow({
 
   return (
     <tr className="border-b border-gray-100 last:border-0 hover:bg-gray-50">
-      {/* Member */}
-      <td className="px-4 py-3">
-        <div className="flex items-center gap-2">
+      {/* Member col=0 */}
+      {col(0) && <td className="px-4 py-3" style={{ overflow: "visible" }}>
+        <div className="flex items-center gap-2 min-w-0">
           {member.image ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
@@ -248,20 +399,32 @@ function MemberRow({
               </span>
             </div>
           )}
-          <div className="min-w-0">
-            <input
-              type="text"
-              value={nameInput}
-              onChange={(e) => setNameInput(e.target.value)}
-              onBlur={() => {
-                if (nameInput.trim() && nameInput !== member.name) {
-                  onNameChange(member.id, nameInput.trim());
-                } else {
-                  setNameInput(member.name ?? "");
-                }
-              }}
-              className="w-full rounded border border-transparent hover:border-gray-300 focus:border-blue-400 px-1 py-0 text-sm font-medium text-gray-900 focus:outline-none bg-transparent focus:bg-white truncate"
-            />
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-1 min-w-0">
+              <input
+                type="text"
+                value={nameInput}
+                onChange={(e) => setNameInput(e.target.value)}
+                onBlur={() => {
+                  if (nameInput.trim() && nameInput !== member.name) {
+                    onNameChange(member.id, nameInput.trim());
+                  } else {
+                    setNameInput(member.name ?? "");
+                  }
+                }}
+                className="rounded border border-transparent hover:border-gray-300 focus:border-blue-400 px-1 py-0 text-sm font-medium text-gray-900 focus:outline-none bg-transparent focus:bg-white truncate"
+              />
+              {member.condicionado && (
+                <div className="relative group shrink-0">
+                  <span className="text-orange-500 cursor-default text-xs leading-none">⚠</span>
+                  <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-1.5 hidden group-hover:block z-20 w-48 bg-gray-900 text-white text-xs rounded-lg px-2.5 py-2 shadow-lg pointer-events-none">
+                    <p className="font-semibold mb-0.5">Condicionado</p>
+                    <p className="text-gray-300">{member.condicionadoReason ?? "Sin motivo especificado"}</p>
+                    <div className="absolute left-1/2 -translate-x-1/2 top-full border-4 border-transparent border-t-gray-900" />
+                  </div>
+                </div>
+              )}
+            </div>
             <input
               type="email"
               value={emailInput}
@@ -277,10 +440,10 @@ function MemberRow({
             />
           </div>
         </div>
-      </td>
+      </td>}
 
-      {/* Sub-team inline edit */}
-      <td className="px-4 py-3">
+      {/* Sub-team col=1 */}
+      {col(1) && <td className="px-4 py-3">
         <input
           value={subTeamInput}
           onChange={(e) => setSubTeamInput(e.target.value)}
@@ -292,10 +455,10 @@ function MemberRow({
           placeholder="—"
           className="w-28 rounded border border-transparent hover:border-gray-300 focus:border-blue-400 px-1.5 py-0.5 text-xs focus:outline-none bg-transparent focus:bg-white"
         />
-      </td>
+      </td>}
 
-      {/* Class Year inline edit */}
-      <td className="px-4 py-3">
+      {/* Class Year col=2 */}
+      {col(2) && <td className="px-4 py-3">
         <input
           type="number"
           min={1900}
@@ -310,10 +473,10 @@ function MemberRow({
           placeholder="—"
           className="w-16 rounded border border-transparent hover:border-gray-300 focus:border-blue-400 px-1.5 py-0.5 text-xs focus:outline-none bg-transparent focus:bg-white"
         />
-      </td>
+      </td>}
 
-      {/* Web ID inline edit */}
-      <td className="px-4 py-3">
+      {/* Web ID col=3 */}
+      {col(3) && <td className="px-4 py-3">
         <input
           type="number"
           min={1}
@@ -327,10 +490,10 @@ function MemberRow({
           placeholder="—"
           className="w-16 rounded border border-transparent hover:border-gray-300 focus:border-blue-400 px-1.5 py-0.5 text-xs focus:outline-none bg-transparent focus:bg-white"
         />
-      </td>
+      </td>}
 
-      {/* Role dropdown */}
-      <td className="px-4 py-3">
+      {/* Role col=4 */}
+      {col(4) && <td className="px-4 py-3">
         <select
           value={member.role}
           onChange={(e) => onFieldChange(member.id, "role", e.target.value)}
@@ -343,10 +506,10 @@ function MemberRow({
             </option>
           ))}
         </select>
-      </td>
+      </td>}
 
-      {/* Status dropdown */}
-      <td className="px-4 py-3">
+      {/* Status col=5 */}
+      {col(5) && <td className="px-4 py-3">
         <select
           value={member.status}
           onChange={(e) => onFieldChange(member.id, "status", e.target.value)}
@@ -359,10 +522,10 @@ function MemberRow({
             </option>
           ))}
         </select>
-      </td>
+      </td>}
 
-      {/* Attendance */}
-      <td className="px-4 py-3">
+      {/* Attendance col=6 */}
+      {col(6) && <td className="px-4 py-3">
         {member.attendanceRate !== null ? (
           <span
             className={`text-xs px-2 py-0.5 rounded border font-medium ${
@@ -378,17 +541,17 @@ function MemberRow({
         ) : (
           <span className="text-xs text-gray-400">—</span>
         )}
-      </td>
+      </td>}
 
-      {/* Completions */}
-      <td className="px-4 py-3 text-gray-700 text-xs">
+      {/* Completions col=7 */}
+      {col(7) && <td className="px-4 py-3 text-gray-700 text-xs">
         {member.completionsCount > 0 ? member.completionsCount : (
           <span className="text-gray-400">0</span>
         )}
-      </td>
+      </td>}
 
-      {/* Last login */}
-      <td className="px-4 py-3 text-xs text-gray-400">
+      {/* Last login col=8 */}
+      {col(8) && <td className="px-4 py-3 text-xs text-gray-400">
         {member.lastLoginAt
           ? new Date(member.lastLoginAt).toLocaleDateString(undefined, {
               month: "short",
@@ -396,10 +559,10 @@ function MemberRow({
               year: "numeric",
             })
           : "Never"}
-      </td>
+      </td>}
 
-      {/* PR Export */}
-      <td className="px-4 py-3">
+      {/* PR Export col=9 */}
+      {col(9) && <td className="px-4 py-3">
         <label className="flex items-center gap-1.5 cursor-pointer select-none">
           <input
             type="checkbox"
@@ -412,11 +575,11 @@ function MemberRow({
             {member.excludeFromExport ? "Hidden" : "Included"}
           </span>
         </label>
-      </td>
+      </td>}
 
-      {/* Actions */}
-      <td className="px-4 py-3">
-        <div className="flex items-center gap-3">
+      {/* Actions col=10 */}
+      {col(10) && <td className="px-4 py-3">
+        <div className="flex items-center gap-3 min-w-0">
           <Link
             href={`/dashboard/admin/members/${member.id}/edit`}
             className="text-xs text-blue-600 hover:underline"
@@ -430,7 +593,7 @@ function MemberRow({
             Work Plan
           </Link>
         </div>
-      </td>
+      </td>}
     </tr>
   );
 }

@@ -448,7 +448,7 @@ function AssigneesEditor({
   const available = (projectMembers ?? []).filter(
     (m) =>
       !assignedIds.has(m.userId) &&
-      (m.user.name?.toLowerCase().includes(search.toLowerCase()) ||
+      (m.user.name?.toLowerCase().includes(search.toLowerCase()) ??
         m.user.email?.toLowerCase().includes(search.toLowerCase())),
   );
 
@@ -632,7 +632,7 @@ function LabelsEditor({
                   onMouseDown={() => addLabel(input.trim())}
                   className="w-full text-left px-3 py-1.5 hover:bg-gray-50 text-xs text-gray-700"
                 >
-                  Create <span className="font-medium">"{input.trim()}"</span>
+                  Create <span className="font-medium">&quot;{input.trim()}&quot;</span>
                 </button>
               )}
               {suggestions.map((s) => (

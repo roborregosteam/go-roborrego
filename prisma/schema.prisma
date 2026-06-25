@@ -130,6 +130,9 @@ model User {
     classYear         Int?
     // Onboarding
     onboardingDismissed Boolean @default(false)
+    // Work plan status
+    condicionado        Boolean @default(false)
+    condicionadoReason  String?
     // Microsoft integration (tokens never exposed to client)
     msAccessToken  String?
     msRefreshToken String?
@@ -142,6 +145,10 @@ model User {
     // Work plan relations
     workPlanInterests         WorkPlanInterest[]
     workPlanCompletions       WorkPlanCompletion[]
+    workPlanWarnings          WorkPlanWarning[]
+    workPlanFaults            WorkPlanFault[]
+    warningsCreated           WorkPlanWarning[] @relation("WarningCreator")
+    faultsCreated             WorkPlanFault[]   @relation("FaultCreator")
     activityReviewAssignments WorkPlanActivityReviewer[]
 
     // Attendance relations
@@ -221,6 +228,8 @@ model Semester {
     createdAt DateTime @default(now())
 
     activities WorkPlanActivity[]
+    warnings   WorkPlanWarning[]
+    faults     WorkPlanFault[]
 }
 
 model WorkPlanActivity {
@@ -282,6 +291,39 @@ model WorkPlanCompletion {
 
     @@index([userId])
     @@index([activityId])
+}
+
+model WorkPlanWarning {
+    id          String   @id @default(cuid())
+    userId      String
+    semesterId  String
+    name        String
+    description String?
+    createdAt   DateTime @default(now())
+    createdBy   String
+
+    user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+    semester Semester @relation(fields: [semesterId], references: [id], onDelete: Cascade)
+    creator  User     @relation("WarningCreator", fields: [createdBy], references: [id])
+
+    @@index([userId, semesterId])
+}
+
+model WorkPlanFault {
+    id          String   @id @default(cuid())
+    userId      String
+    semesterId  String
+    name        String
+    description String?
+    points      Int
+    createdAt   DateTime @default(now())
+    createdBy   String
+
+    user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+    semester Semester @relation(fields: [semesterId], references: [id], onDelete: Cascade)
+    creator  User     @relation("FaultCreator", fields: [createdBy], references: [id])
+
+    @@index([userId, semesterId])
 }
 
 // ─── Attendance ────────────────────────────────────────────────────────────────

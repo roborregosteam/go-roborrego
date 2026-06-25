@@ -157,18 +157,48 @@ function SummaryBar({ semesterId }: { semesterId: string }) {
   if (!summary) return null;
 
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
-      <StatCard label="Points Earned" value={summary.approvedPoints} />
-      <StatCard
-        label="Tentative Points"
-        value={summary.tentativePoints}
-        note="from interests"
-      />
-      <StatCard label="Interested In" value={summary.interestedCount} />
-      <StatCard
-        label="Mandatory"
-        value={`${summary.mandatoryCompleted} / ${summary.mandatoryTotal}`}
-      />
+    <div className="space-y-3 mb-6">
+      {summary.condicionado && (
+        <div className="px-4 py-2.5 bg-orange-50 border border-orange-200 rounded-xl text-sm text-orange-800">
+          <span className="font-semibold">Condicionado</span>
+          {summary.condicionadoReason ? (
+            <span className="text-orange-600 text-xs ml-2">— {summary.condicionadoReason}</span>
+          ) : (
+            <span className="text-orange-600 text-xs ml-2">— tu membresía está bajo condición en este semestre.</span>
+          )}
+        </div>
+      )}
+      {(summary.warnings.length > 0 || summary.faults.length > 0) && (
+        <div className="flex flex-wrap gap-2">
+          {summary.warnings.map((w) => (
+            <span key={w.id} className="flex items-center gap-1 text-xs bg-yellow-50 border border-yellow-200 text-yellow-800 px-2.5 py-1 rounded-full">
+              ⚠ {w.name}
+            </span>
+          ))}
+          {summary.faults.map((f) => (
+            <span key={f.id} className="flex items-center gap-1 text-xs bg-red-50 border border-red-200 text-red-700 px-2.5 py-1 rounded-full">
+              ✕ {f.name} <span className="font-semibold">−{f.points} pts</span>
+            </span>
+          ))}
+        </div>
+      )}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <StatCard
+          label="Puntos Netos"
+          value={summary.netPoints}
+          note={summary.faultPoints > 0 ? `−${summary.faultPoints} por faltas` : undefined}
+        />
+        <StatCard
+          label="Tentative Points"
+          value={summary.tentativePoints}
+          note="from interests"
+        />
+        <StatCard label="Interested In" value={summary.interestedCount} />
+        <StatCard
+          label="Mandatory"
+          value={`${summary.mandatoryCompleted} / ${summary.mandatoryTotal}`}
+        />
+      </div>
     </div>
   );
 }

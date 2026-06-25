@@ -19,6 +19,7 @@ export default async function MemberProgressPage({
     <MemberProgressClient
       memberId={memberId}
       isAdmin={session.user.role === "ADMIN"}
+      isSelf={session.user.id === memberId}
       backHref={from === "roster" ? "/dashboard/admin/members" : "/dashboard/workplan"}
     />
   );
