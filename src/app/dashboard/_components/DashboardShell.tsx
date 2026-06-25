@@ -109,7 +109,7 @@ export function DashboardShell({
 
 function NavLink({ href, children }: { href: string; children: React.ReactNode }) {
   const pathname = usePathname();
-  const isActive = pathname === href || (href !== "/dashboard" && pathname.startsWith(href));
+  const isActive = pathname === href || (href !== "/dashboard" && href !== "/dashboard/admin" && pathname.startsWith(href));
   return (
     <Link
       href={href}

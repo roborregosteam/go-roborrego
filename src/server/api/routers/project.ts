@@ -205,6 +205,32 @@ export const projectRouter = createTRPCRouter({
 
   // ─── Members ───────────────────────────────────────────────────────────────
 
+  getProjectMembers: protectedProcedure
+    .input(z.object({ projectId: z.string() }))
+    .query(({ ctx, input }) => {
+      return ctx.db.projectMember.findMany({
+        where: { projectId: input.projectId },
+        include: {
+          user: { select: { id: true, name: true, email: true, image: true } },
+        },
+        orderBy: { addedAt: "asc" },
+      });
+    }),
+
+  getProjectLabels: protectedProcedure
+    .input(z.object({ projectId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const tasks = await ctx.db.task.findMany({
+        where: { projectId: input.projectId },
+        select: { labels: true },
+      });
+      const seen = new Set<string>();
+      for (const t of tasks) {
+        for (const l of t.labels) seen.add(l);
+      }
+      return [...seen].sort();
+    }),
+
   getAvailableMembers: protectedProcedure
     .input(z.object({ projectId: z.string() }))
     .query(async ({ ctx, input }) => {

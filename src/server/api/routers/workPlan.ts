@@ -478,7 +478,7 @@ export const workPlanRouter = createTRPCRouter({
   getAdminMemberStats: adminProcedure
     .input(z.object({ semesterId: z.string() }))
     .query(async ({ ctx, input }) => {
-      const [members, completions, interests] = await Promise.all([
+      const [members, completions, interests, mandatoryActivities] = await Promise.all([
         ctx.db.user.findMany({
           select: { id: true, name: true, image: true, status: true, role: true },
           orderBy: { name: "asc" },
@@ -488,20 +488,28 @@ export const workPlanRouter = createTRPCRouter({
             status: "APPROVED",
             activity: { semesterId: input.semesterId },
           },
-          select: { userId: true, activity: { select: { points: true } } },
+          select: { userId: true, activityId: true, activity: { select: { points: true, isMandatory: true } } },
         }),
         ctx.db.workPlanInterest.findMany({
           where: { activity: { semesterId: input.semesterId } },
           select: { userId: true, activity: { select: { points: true } } },
         }),
+        ctx.db.workPlanActivity.findMany({
+          where: { semesterId: input.semesterId, isMandatory: true },
+          select: { id: true },
+        }),
       ]);
 
+      const mandatoryIds = new Set(mandatoryActivities.map((a) => a.id));
+      const mandatoryTotal = mandatoryIds.size;
+
       const totalMap = new Map<string, number>();
+      const mandatoryCompletedMap = new Map<string, number>();
       for (const c of completions) {
-        totalMap.set(
-          c.userId,
-          (totalMap.get(c.userId) ?? 0) + c.activity.points,
-        );
+        totalMap.set(c.userId, (totalMap.get(c.userId) ?? 0) + c.activity.points);
+        if (mandatoryIds.has(c.activityId)) {
+          mandatoryCompletedMap.set(c.userId, (mandatoryCompletedMap.get(c.userId) ?? 0) + 1);
+        }
       }
       const tentativeMap = new Map<string, number>();
       for (const i of interests) {
@@ -519,6 +527,8 @@ export const workPlanRouter = createTRPCRouter({
           totalPoints,
           tentativePoints,
           difference: totalPoints - tentativePoints,
+          mandatoryCompleted: mandatoryCompletedMap.get(m.id) ?? 0,
+          mandatoryTotal,
         };
       });
     }),

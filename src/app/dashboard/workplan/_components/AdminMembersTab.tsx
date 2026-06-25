@@ -8,6 +8,7 @@ type SortKey = "totalPoints" | "tentativePoints" | "difference";
 type SortDir = "asc" | "desc";
 type Status = "ACTIVE" | "INACTIVE" | "ALUMNI";
 type Role = "VIEWER" | "MEMBER" | "ADMIN";
+type CompletionFilter = "all" | "missing" | "done";
 
 const ALL_STATUSES: Status[] = ["ACTIVE", "INACTIVE", "ALUMNI"];
 const ALL_ROLES: Role[] = ["VIEWER", "MEMBER", "ADMIN"];
@@ -31,6 +32,7 @@ export function AdminMembersTab({ semesterId }: { semesterId: string }) {
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [visibleStatuses, setVisibleStatuses] = useState<Set<Status>>(new Set(ALL_STATUSES));
   const [visibleRoles, setVisibleRoles] = useState<Set<Role>>(new Set(ALL_ROLES));
+  const [completionFilter, setCompletionFilter] = useState<CompletionFilter>("all");
   const [search, setSearch] = useState("");
 
   function toggleSort(key: SortKey) {
@@ -71,12 +73,14 @@ export function AdminMembersTab({ semesterId }: { semesterId: string }) {
   if (isLoading) return <p className="text-sm text-gray-400">Loading…</p>;
 
   const query = search.trim().toLowerCase();
-  const filtered = (data ?? []).filter(
-    (e) =>
-      visibleStatuses.has(e.user.status as Status) &&
-      visibleRoles.has(e.user.role as Role) &&
-      (!query || (e.user.name ?? "").toLowerCase().includes(query)),
-  );
+  const filtered = (data ?? []).filter((e) => {
+    if (!visibleStatuses.has(e.user.status as Status)) return false;
+    if (!visibleRoles.has(e.user.role as Role)) return false;
+    if (query && !(e.user.name ?? "").toLowerCase().includes(query)) return false;
+    if (completionFilter === "missing" && e.mandatoryTotal > 0 && e.mandatoryCompleted >= e.mandatoryTotal) return false;
+    if (completionFilter === "done" && e.mandatoryCompleted < e.mandatoryTotal) return false;
+    return true;
+  });
 
   const sorted = [...filtered].sort((a, b) => {
     const diff = a[sortKey] - b[sortKey];
@@ -125,6 +129,22 @@ export function AdminMembersTab({ semesterId }: { semesterId: string }) {
               }`}
             >
               {ROLE_LABELS[r]}
+            </button>
+          ))}
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs font-medium text-gray-500">Mandatory:</span>
+          {(["all", "missing", "done"] as CompletionFilter[]).map((f) => (
+            <button
+              key={f}
+              onClick={() => setCompletionFilter(f)}
+              className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
+                completionFilter === f
+                  ? "bg-amber-500 text-white border-amber-500"
+                  : "bg-white text-gray-500 border-gray-300 hover:border-gray-400"
+              }`}
+            >
+              {f === "all" ? "All" : f === "missing" ? "Missing" : "Completed"}
             </button>
           ))}
         </div>

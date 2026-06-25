@@ -186,50 +186,18 @@ export function TaskPanel({
         ) : null}
 
         {/* Assignees */}
-        <div>
-          <p className="text-xs font-medium text-gray-500 mb-1.5">Assignees</p>
-          {task.assignees.length === 0 ? (
-            <p className="text-xs text-gray-400">None</p>
-          ) : (
-            <div className="flex flex-wrap gap-1.5">
-              {task.assignees.map((a) => (
-                <div
-                  key={a.user.id}
-                  className="flex items-center gap-1.5 bg-gray-50 rounded-full px-2 py-0.5 text-xs text-gray-700"
-                >
-                  {a.user.image ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={a.user.image} alt="" className="w-4 h-4 rounded-full" />
-                  ) : (
-                    <div className="w-4 h-4 rounded-full bg-blue-100 flex items-center justify-center">
-                      <span className="text-[8px] text-blue-600 font-bold">
-                        {a.user.name?.charAt(0) ?? "?"}
-                      </span>
-                    </div>
-                  )}
-                  {a.user.name ?? "—"}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+        <AssigneesEditor
+          task={task}
+          isMember={isMember}
+          onUpdate={(ids) => updateTask.mutate({ id: task.id, assigneeIds: ids })}
+        />
 
         {/* Labels */}
-        {task.labels.length > 0 && (
-          <div>
-            <p className="text-xs font-medium text-gray-500 mb-1.5">Labels</p>
-            <div className="flex flex-wrap gap-1">
-              {task.labels.map((label) => (
-                <span
-                  key={label}
-                  className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded"
-                >
-                  {label}
-                </span>
-              ))}
-            </div>
-          </div>
-        )}
+        <LabelsEditor
+          task={task}
+          isMember={isMember}
+          onUpdate={(labels) => updateTask.mutate({ id: task.id, labels })}
+        />
 
         {/* Creator + dates */}
         <div className="text-xs text-gray-400 space-y-0.5 pt-1 border-t border-gray-100">
@@ -454,6 +422,233 @@ function AttachmentsSection({
         </>
       )}
     </>
+  );
+}
+
+function AssigneesEditor({
+  task,
+  isMember,
+  onUpdate,
+}: {
+  task: Task;
+  isMember: boolean;
+  onUpdate: (ids: string[]) => void;
+}) {
+  const { data: projectMembers } = api.project.getProjectMembers.useQuery(
+    { projectId: task.projectId },
+    { enabled: isMember },
+  );
+
+  const [search, setSearch] = useState("");
+  const [open, setOpen] = useState(false);
+
+  const assignedIds = new Set(task.assignees.map((a) => a.user.id));
+  const currentIds = task.assignees.map((a) => a.user.id);
+
+  const available = (projectMembers ?? []).filter(
+    (m) =>
+      !assignedIds.has(m.userId) &&
+      (m.user.name?.toLowerCase().includes(search.toLowerCase()) ||
+        m.user.email?.toLowerCase().includes(search.toLowerCase())),
+  );
+
+  function addAssignee(userId: string) {
+    onUpdate([...currentIds, userId]);
+    setSearch("");
+    setOpen(false);
+  }
+
+  function removeAssignee(userId: string) {
+    onUpdate(currentIds.filter((id) => id !== userId));
+  }
+
+  return (
+    <div>
+      <p className="text-xs font-medium text-gray-500 mb-1.5">Assignees</p>
+      <div className="flex flex-wrap gap-1.5 mb-1.5">
+        {task.assignees.map((a) => (
+          <div
+            key={a.user.id}
+            className="flex items-center gap-1.5 bg-gray-50 rounded-full px-2 py-0.5 text-xs text-gray-700"
+          >
+            {a.user.image ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={a.user.image} alt="" className="w-4 h-4 rounded-full" />
+            ) : (
+              <div className="w-4 h-4 rounded-full bg-blue-100 flex items-center justify-center">
+                <span className="text-[8px] text-blue-600 font-bold">
+                  {a.user.name?.charAt(0) ?? "?"}
+                </span>
+              </div>
+            )}
+            {a.user.name ?? "—"}
+            {isMember && (
+              <button
+                onClick={() => removeAssignee(a.user.id)}
+                className="text-gray-400 hover:text-red-500 ml-0.5 leading-none"
+                aria-label="Remove"
+              >
+                ×
+              </button>
+            )}
+          </div>
+        ))}
+        {task.assignees.length === 0 && !isMember && (
+          <p className="text-xs text-gray-400">None</p>
+        )}
+      </div>
+
+      {isMember && (
+        <div className="relative">
+          <input
+            type="text"
+            placeholder="Add assignee…"
+            value={search}
+            onChange={(e) => { setSearch(e.target.value); setOpen(true); }}
+            onFocus={() => setOpen(true)}
+            onBlur={() => setTimeout(() => setOpen(false), 150)}
+            className="w-full text-xs rounded border border-gray-200 px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-400"
+          />
+          {open && available.length > 0 && (
+            <div className="absolute z-20 top-full left-0 right-0 mt-0.5 bg-white border border-gray-200 rounded shadow-md max-h-40 overflow-y-auto">
+              {available.map((m) => (
+                <button
+                  key={m.userId}
+                  onMouseDown={() => addAssignee(m.userId)}
+                  className="w-full text-left px-3 py-1.5 hover:bg-gray-50 flex items-center gap-2"
+                >
+                  {m.user.image ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={m.user.image} alt="" className="w-5 h-5 rounded-full" />
+                  ) : (
+                    <div className="w-5 h-5 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
+                      <span className="text-[8px] text-blue-600 font-bold">
+                        {m.user.name?.charAt(0) ?? "?"}
+                      </span>
+                    </div>
+                  )}
+                  <span className="text-xs font-medium text-gray-800">{m.user.name}</span>
+                  <span className="text-[10px] text-gray-400">{m.user.email}</span>
+                </button>
+              ))}
+            </div>
+          )}
+          {open && search.length > 0 && available.length === 0 && (
+            <div className="absolute z-20 top-full left-0 right-0 mt-0.5 bg-white border border-gray-200 rounded shadow-md px-3 py-2 text-xs text-gray-400">
+              No matching members
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function LabelsEditor({
+  task,
+  isMember,
+  onUpdate,
+}: {
+  task: Task;
+  isMember: boolean;
+  onUpdate: (labels: string[]) => void;
+}) {
+  const [input, setInput] = useState("");
+  const [open, setOpen] = useState(false);
+
+  const { data: projectLabels } = api.project.getProjectLabels.useQuery(
+    { projectId: task.projectId },
+    { enabled: isMember },
+  );
+
+  const suggestions = (projectLabels ?? []).filter(
+    (l) =>
+      !task.labels.includes(l) &&
+      l.toLowerCase().includes(input.toLowerCase()),
+  );
+  const showDropdown = open && (suggestions.length > 0 || (input.trim().length > 0 && !task.labels.includes(input.trim())));
+
+  function addLabel(value?: string) {
+    const trimmed = (value ?? input).trim();
+    if (!trimmed || task.labels.includes(trimmed)) return;
+    onUpdate([...task.labels, trimmed]);
+    setInput("");
+    setOpen(false);
+  }
+
+  function removeLabel(label: string) {
+    onUpdate(task.labels.filter((l) => l !== label));
+  }
+
+  if (!isMember && task.labels.length === 0) return null;
+
+  return (
+    <div>
+      <p className="text-xs font-medium text-gray-500 mb-1.5">Labels</p>
+      <div className="flex flex-wrap gap-1 mb-1.5">
+        {task.labels.map((label) => (
+          <span
+            key={label}
+            className="flex items-center gap-1 text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded"
+          >
+            {label}
+            {isMember && (
+              <button
+                onClick={() => removeLabel(label)}
+                className="text-gray-400 hover:text-red-500 leading-none"
+                aria-label="Remove label"
+              >
+                ×
+              </button>
+            )}
+          </span>
+        ))}
+      </div>
+      {isMember && (
+        <div className="relative flex gap-1">
+          <input
+            type="text"
+            placeholder="Add label…"
+            value={input}
+            onChange={(e) => { setInput(e.target.value); setOpen(true); }}
+            onFocus={() => setOpen(true)}
+            onBlur={() => setTimeout(() => setOpen(false), 150)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") { e.preventDefault(); addLabel(); }
+            }}
+            className="flex-1 text-xs rounded border border-gray-200 px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-400"
+          />
+          <button
+            onClick={() => addLabel()}
+            disabled={!input.trim()}
+            className="text-xs px-2 py-1 bg-gray-100 text-gray-600 rounded hover:bg-gray-200 disabled:opacity-40 transition-colors"
+          >
+            Add
+          </button>
+          {showDropdown && (
+            <div className="absolute z-20 top-full left-0 right-8 mt-0.5 bg-white border border-gray-200 rounded shadow-md max-h-40 overflow-y-auto">
+              {input.trim() && !task.labels.includes(input.trim()) && !suggestions.includes(input.trim()) && (
+                <button
+                  onMouseDown={() => addLabel(input.trim())}
+                  className="w-full text-left px-3 py-1.5 hover:bg-gray-50 text-xs text-gray-700"
+                >
+                  Create <span className="font-medium">"{input.trim()}"</span>
+                </button>
+              )}
+              {suggestions.map((s) => (
+                <button
+                  key={s}
+                  onMouseDown={() => addLabel(s)}
+                  className="w-full text-left px-3 py-1.5 hover:bg-gray-50 text-xs text-gray-700"
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
 
